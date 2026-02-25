@@ -13,7 +13,7 @@
 #   chmod +x setup.sh
 #   ./setup.sh
 #
-# Everything runs locally. No data leaves your machine.
+# After setup, all AI inference runs locally. No data leaves your machine.
 # ============================================================================
 
 set -euo pipefail
@@ -36,7 +36,7 @@ step()  { echo -e "\n${BOLD}── Step $1 ──${NC}"; }
 echo -e "${BOLD}"
 echo "============================================"
 echo "  Local AI Setup for Legal Work"
-echo "  Arch Linux + AMD RX 9070 XT"
+echo "  Arch Linux + AMD GPU"
 echo "============================================"
 echo -e "${NC}"
 echo "This will install:"
@@ -81,17 +81,28 @@ if command -v ollama &>/dev/null; then
 else
     info "Installing ollama-rocm (includes Vulkan GPU support)..."
 
-    # Prefer ollama-rocm from official repos, fall back to AUR
+    # Prefer pacman packages (verified by distro maintainers)
     if pacman -Si ollama-rocm &>/dev/null 2>&1; then
         sudo pacman -S --needed --noconfirm ollama-rocm
     elif pacman -Si ollama &>/dev/null 2>&1; then
-        # Base ollama package (may not have full GPU support)
         sudo pacman -S --needed --noconfirm ollama
         warn "Installed base 'ollama' package. For best GPU performance, consider 'ollama-rocm' from AUR."
     else
-        # Fallback: official install script
-        info "Not in pacman repos. Using Ollama's official installer..."
-        curl -fsSL https://ollama.com/install.sh | sh
+        # Fallback: download installer to a temp file for inspection
+        info "Not in pacman repos. Downloading Ollama installer for review..."
+        INSTALLER_PATH=$(mktemp /tmp/ollama-install-XXXXXX.sh)
+        curl -fsSL https://ollama.com/install.sh -o "$INSTALLER_PATH"
+        warn "Downloaded installer to: $INSTALLER_PATH"
+        warn "You can inspect it before running: less $INSTALLER_PATH"
+        read -p "Execute the Ollama installer? [y/N] " run_confirm
+        if [[ "${run_confirm:-N}" =~ ^[Yy]$ ]]; then
+            sh "$INSTALLER_PATH"
+        else
+            error "Ollama not installed. Install manually from https://ollama.com"
+            rm -f "$INSTALLER_PATH"
+            exit 1
+        fi
+        rm -f "$INSTALLER_PATH"
     fi
     ok "Ollama installed"
 fi
@@ -101,11 +112,21 @@ step "3/7: Configuring GPU acceleration"
 
 info "Setting up Vulkan (RADV) backend and performance tuning..."
 
-# Create systemd override directory
-sudo mkdir -p /etc/systemd/system/ollama.service.d/
+OVERRIDE_DIR="/etc/systemd/system/ollama.service.d"
+OVERRIDE_FILE="$OVERRIDE_DIR/override.conf"
 
-# Write tuning override
-sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null << 'OVERRIDE'
+# Check for existing override
+if [[ -f "$OVERRIDE_FILE" ]]; then
+    warn "Existing Ollama override found at $OVERRIDE_FILE"
+    read -p "Overwrite with recommended GPU tuning? [Y/n] " ow_confirm
+    if [[ "${ow_confirm:-Y}" =~ ^[Nn]$ ]]; then
+        info "Skipping GPU tuning override."
+    fi
+fi
+
+if [[ ! -f "$OVERRIDE_FILE" ]] || [[ ! "${ow_confirm:-Y}" =~ ^[Nn]$ ]]; then
+    sudo mkdir -p "$OVERRIDE_DIR"
+    sudo tee "$OVERRIDE_FILE" > /dev/null << 'OVERRIDE'
 [Service]
 # Force Vulkan (RADV) backend — faster than ROCm on RDNA 4 (Wave32 hardware)
 Environment="OLLAMA_FLASH_ATTENTION=1"
@@ -113,11 +134,13 @@ Environment="OLLAMA_KV_CACHE_TYPE=q8_0"
 Environment="OLLAMA_MULTIUSER_CACHE=1"
 Environment="OLLAMA_NUM_PARALLEL=2"
 Environment="OLLAMA_KEEP_ALIVE=10m"
+# Bind to localhost only — not accessible from other machines
+Environment="OLLAMA_HOST=127.0.0.1:11434"
 # Force RADV Vulkan driver (not AMDVLK)
 Environment="AMD_VULKAN_ICD=RADV"
 OVERRIDE
-
-ok "GPU tuning applied (flash attention, q8 KV cache, Vulkan RADV)"
+    ok "GPU tuning applied (flash attention, q8 KV cache, Vulkan RADV, localhost-only)"
+fi
 
 # Start and enable Ollama
 sudo systemctl daemon-reload
@@ -168,49 +191,59 @@ else
     info "Installing Docker..."
     sudo pacman -S --needed --noconfirm docker docker-compose
     sudo systemctl enable --now docker.service
-    sudo usermod -aG docker "$USER"
-    warn "Added your user to the 'docker' group. You may need to log out and back in."
-    warn "For now, using sudo for the Docker commands..."
+
+    warn "Docker requires your user to be in the 'docker' group."
+    warn "Note: The docker group grants root-equivalent access on this machine."
+    read -p "Add $USER to the docker group? [Y/n] " docker_confirm
+    if [[ "${docker_confirm:-Y}" =~ ^[Nn]$ ]]; then
+        info "Skipping. You'll need to use 'sudo docker' for commands."
+    else
+        sudo usermod -aG docker "$USER"
+        warn "Added $USER to docker group. Log out and back in for it to take effect."
+    fi
+    warn "For now, using sudo for Docker commands..."
 fi
 
 # Ensure Docker is running
+DOCKER_CMD=(docker)
 if ! docker info &>/dev/null 2>&1; then
     if sudo docker info &>/dev/null 2>&1; then
-        DOCKER_CMD="sudo docker"
+        DOCKER_CMD=(sudo docker)
         warn "Using 'sudo docker' (log out and back in to use without sudo)"
     else
         sudo systemctl start docker.service
         sleep 2
         if sudo docker info &>/dev/null 2>&1; then
-            DOCKER_CMD="sudo docker"
+            DOCKER_CMD=(sudo docker)
         else
             error "Docker won't start. Try: sudo systemctl start docker"
             error "You can install Open WebUI manually later (see README)."
-            DOCKER_CMD=""
+            DOCKER_CMD=()
         fi
     fi
-else
-    DOCKER_CMD="docker"
 fi
 
 # ── Install Open WebUI ──
 step "6/7: Installing Open WebUI (chat interface)"
 
-if [[ -n "${DOCKER_CMD:-}" ]]; then
-    if $DOCKER_CMD ps -a --format '{{.Names}}' 2>/dev/null | grep -q "open-webui"; then
+# Pin to a specific release tag for supply chain safety
+OPEN_WEBUI_IMAGE="ghcr.io/open-webui/open-webui:v0.6.5"
+
+if [[ ${#DOCKER_CMD[@]} -gt 0 ]]; then
+    if "${DOCKER_CMD[@]}" ps -a --format '{{.Names}}' 2>/dev/null | grep -q "open-webui"; then
         ok "Open WebUI container already exists"
-        # Make sure it's running
-        $DOCKER_CMD start open-webui 2>/dev/null || true
+        "${DOCKER_CMD[@]}" start open-webui 2>/dev/null || true
     else
         info "Starting Open WebUI container..."
-        $DOCKER_CMD run -d \
-            -p 3000:8080 \
+        # Bind to 127.0.0.1 only — not accessible from other machines on the network
+        "${DOCKER_CMD[@]}" run -d \
+            -p 127.0.0.1:3000:8080 \
             --add-host=host.docker.internal:host-gateway \
             -v open-webui:/app/backend/data \
             --name open-webui \
             --restart always \
-            ghcr.io/open-webui/open-webui:main
-        ok "Open WebUI is running"
+            "$OPEN_WEBUI_IMAGE"
+        ok "Open WebUI is running (localhost only)"
     fi
 else
     warn "Docker not available. Install Open WebUI manually:"
@@ -242,6 +275,20 @@ if echo "$test_response" | python3 -c "import sys,json; print(json.load(sys.stdi
 else
     warn "Test didn't return expected output. Ollama may still be loading the model."
     warn "Try manually: ollama run gemma3:12b"
+fi
+
+# ── Verify Security ──
+echo ""
+info "Verifying network security..."
+if ss -tlnp 2>/dev/null | grep ":11434" | grep -q "127.0.0.1"; then
+    ok "Ollama bound to localhost only (127.0.0.1:11434)"
+else
+    warn "Could not verify Ollama bind address. Check: ss -tlnp | grep 11434"
+fi
+if ss -tlnp 2>/dev/null | grep ":3000" | grep -q "127.0.0.1"; then
+    ok "Open WebUI bound to localhost only (127.0.0.1:3000)"
+else
+    warn "Could not verify Open WebUI bind address. Check: ss -tlnp | grep 3000"
 fi
 
 # ── Done ──

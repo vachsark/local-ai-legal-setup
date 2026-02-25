@@ -1,17 +1,27 @@
 # Local AI for Legal Work
 
-Private, local AI that runs entirely on your machine. No data leaves your computer — ever.
+Private, local AI that runs entirely on your machine. After initial setup (which downloads models from the internet), all AI inference is local — no API calls, no cloud services.
 
-**Hardware**: AMD RX 9070 XT (16GB VRAM), Arch Linux
+**Hardware**: AMD RX 9070 XT (16GB VRAM), Arch Linux (Windows script also included)
 **Stack**: Ollama (model server) + Open WebUI (chat interface)
 
 ---
 
 ## Quick Start
 
+### Linux (Arch)
+
 ```bash
 chmod +x setup.sh
 ./setup.sh
+```
+
+### Windows
+
+```powershell
+# Open PowerShell as Administrator
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+.\setup-windows.ps1
 ```
 
 The script installs everything, downloads 3 models (~31GB), and starts the chat interface. Takes 15-30 minutes depending on internet speed.
@@ -285,15 +295,16 @@ The model appears in the Open WebUI dropdown automatically.
 ### Update
 
 ```bash
-# Update Ollama
-sudo pacman -Syu ollama-rocm   # or: curl -fsSL https://ollama.com/install.sh | sh
+# Update Ollama (Arch Linux)
+sudo pacman -Syu ollama-rocm
 
-# Update Open WebUI
-docker pull ghcr.io/open-webui/open-webui:main
+# Update Open WebUI (pin to a specific version for safety)
+# Check latest release at: https://github.com/open-webui/open-webui/releases
+docker pull ghcr.io/open-webui/open-webui:v0.6.5
 docker stop open-webui && docker rm open-webui
-docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway \
+docker run -d -p 127.0.0.1:3000:8080 --add-host=host.docker.internal:host-gateway \
     -v open-webui:/app/backend/data --name open-webui --restart always \
-    ghcr.io/open-webui/open-webui:main
+    ghcr.io/open-webui/open-webui:v0.6.5
 ```
 
 ### Check GPU Usage
@@ -360,11 +371,27 @@ Some prompts are too long for the context window. Try:
 
 ## Privacy & Security Notes
 
-- **All processing is local.** Ollama runs models directly on your GPU. No API calls, no cloud services, no telemetry.
-- **Open WebUI stores chat history locally** in a Docker volume on your machine. It does not phone home.
-- **No internet required** after initial setup. You can disconnect from the internet and everything still works.
-- **To verify**: Run `sudo ss -tlnp | grep ollama` — Ollama only listens on `127.0.0.1:11434` (localhost). It is not accessible from other machines on your network.
-- **To fully air-gap**: After setup, you can block all outbound traffic and the system will continue to function.
+- **All inference is local.** After initial setup, Ollama runs models directly on your GPU. No API calls, no cloud services.
+- **Initial setup requires internet** to download Ollama, Docker images, and AI models (~31GB). After that, no internet is needed.
+- **Both services bind to localhost only** (`127.0.0.1`). They are not accessible from other machines on your network.
+- **Open WebUI stores chat history locally** in a Docker volume on your machine.
+- **The setup script adds your user to the `docker` group** (with your confirmation). This grants root-equivalent access on the local machine. If this is a concern, use `sudo docker` commands instead.
+
+### Verify Network Security
+
+```bash
+# Linux: Verify both services are localhost-only
+sudo ss -tlnp | grep -E "11434|3000"
+# Should show 127.0.0.1 for both ports
+
+# Windows:
+netstat -an | findstr "11434 3000"
+# Should show 127.0.0.1 for both ports
+```
+
+### Air-Gap After Setup
+
+After the initial model download, you can disconnect from the internet entirely. Everything still works. For maximum security, block all outbound traffic after setup.
 
 ---
 

@@ -9,10 +9,11 @@
 #   3. Recommended models for legal work
 #
 # Usage:
-#   Right-click this file → "Run with PowerShell"
-#   OR open PowerShell as Administrator and run: .\setup-windows.ps1
+#   1. Open PowerShell as Administrator
+#   2. If needed: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+#   3. Run: .\setup-windows.ps1
 #
-# Everything runs locally. No data leaves your machine.
+# After setup, all AI inference runs locally. No data leaves your machine.
 # ============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -99,10 +100,27 @@ if ($ollamaInPath -or (Test-Path $ollamaPath)) {
     Write-Info "Downloading Ollama installer..."
 
     $installerUrl = "https://ollama.com/download/OllamaSetup.exe"
-    $installerPath = "$env:TEMP\OllamaSetup.exe"
+    $randomSuffix = [System.IO.Path]::GetRandomFileName().Replace(".", "")
+    $installerPath = "$env:TEMP\OllamaSetup-$randomSuffix.exe"
 
     try {
         Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+
+        # Verify the downloaded file has a valid Authenticode signature
+        $sig = Get-AuthenticodeSignature -FilePath $installerPath
+        if ($sig.Status -eq "Valid") {
+            Write-Ok "Installer signature verified: $($sig.SignerCertificate.Subject)"
+        } else {
+            Write-Warn "Installer signature status: $($sig.Status)"
+            Write-Warn "Downloaded file: $installerPath"
+            $sigConfirm = Read-Host "Run anyway? [y/N]"
+            if (-not $sigConfirm -or $sigConfirm -notmatch '^[Yy]') {
+                Write-Err "Aborted. Install manually from https://ollama.com/download"
+                Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
+                exit 1
+            }
+        }
+
         Write-Info "Running Ollama installer (follow the prompts if any appear)..."
         Start-Process -FilePath $installerPath -Wait
         Write-Ok "Ollama installed"
@@ -111,6 +129,9 @@ if ($ollamaInPath -or (Test-Path $ollamaPath)) {
         Write-Host "After installing Ollama, run this script again."
         Read-Host "Press Enter to exit"
         exit 1
+    } finally {
+        # Clean up installer
+        Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
     }
 
     # Refresh PATH
@@ -126,17 +147,26 @@ $envVars = @{
     "OLLAMA_KV_CACHE_TYPE"   = "q8_0"
     "OLLAMA_KEEP_ALIVE"      = "10m"
     "OLLAMA_NUM_PARALLEL"    = "2"
+    "OLLAMA_HOST"            = "127.0.0.1:11434"
 }
 
+Write-Info "The following environment variables will be set for your user account:"
 foreach ($key in $envVars.Keys) {
-    $current = [System.Environment]::GetEnvironmentVariable($key, "User")
-    if ($current -ne $envVars[$key]) {
-        [System.Environment]::SetEnvironmentVariable($key, $envVars[$key], "User")
-        $env:$key = $envVars[$key]
-    }
+    Write-Host "    $key = $($envVars[$key])"
 }
-
-Write-Ok "GPU tuning applied (flash attention, q8 KV cache)"
+$envConfirm = Read-Host "Apply these settings? [Y/n]"
+if (-not $envConfirm -or $envConfirm -match '^[Yy]') {
+    foreach ($key in $envVars.Keys) {
+        $current = [System.Environment]::GetEnvironmentVariable($key, "User")
+        if ($current -ne $envVars[$key]) {
+            [System.Environment]::SetEnvironmentVariable($key, $envVars[$key], "User")
+            Set-Item -Path "Env:\$key" -Value $envVars[$key]
+        }
+    }
+    Write-Ok "GPU tuning applied (flash attention, q8 KV cache, localhost-only)"
+} else {
+    Write-Warn "Skipping GPU tuning. You can set these manually later."
+}
 
 if ($gpuType -eq "amd") {
     Write-Info "AMD GPU: Ollama will auto-detect Vulkan on Windows"
@@ -240,14 +270,16 @@ if (-not $dockerAvailable) {
     if ($pipAvailable) {
         $usePip = Read-Host "Python/pip detected. Install Open WebUI via pip now? [Y/n]"
         if (-not $usePip -or $usePip -match '^[Yy]') {
-            Write-Info "Installing Open WebUI via pip..."
-            & pip install open-webui
+            Write-Info "Installing Open WebUI via pip (in a virtual environment)..."
+            $venvPath = "$env:USERPROFILE\.open-webui-venv"
+            & python -m venv $venvPath
+            & "$venvPath\Scripts\pip.exe" install open-webui
             if ($LASTEXITCODE -eq 0) {
-                Write-Ok "Open WebUI installed via pip"
-                Write-Info "Starting Open WebUI..."
-                Start-Process -FilePath "open-webui" -ArgumentList "serve", "--port", "3000" -WindowStyle Hidden
+                Write-Ok "Open WebUI installed via pip (venv: $venvPath)"
+                Write-Info "Starting Open WebUI (bound to localhost)..."
+                Start-Process -FilePath "$venvPath\Scripts\open-webui.exe" -ArgumentList "serve", "--host", "127.0.0.1", "--port", "3000" -WindowStyle Hidden
                 Start-Sleep -Seconds 5
-                Write-Ok "Open WebUI is running"
+                Write-Ok "Open WebUI is running (localhost only)"
                 $webUIInstalled = $true
             } else {
                 Write-Warn "pip install failed. Try manually: pip install open-webui"
@@ -270,14 +302,16 @@ if (-not $dockerAvailable) {
         docker start open-webui 2>$null
     } else {
         Write-Info "Starting Open WebUI container..."
+        # Pin to a specific release tag for supply chain safety
+        # Bind to 127.0.0.1 only — not accessible from other machines on the network
         docker run -d `
-            -p 3000:8080 `
+            -p 127.0.0.1:3000:8080 `
             --add-host=host.docker.internal:host-gateway `
             -v open-webui:/app/backend/data `
             --name open-webui `
             --restart always `
-            ghcr.io/open-webui/open-webui:main
-        Write-Ok "Open WebUI is running"
+            ghcr.io/open-webui/open-webui:v0.6.5
+        Write-Ok "Open WebUI is running (localhost only)"
     }
     $webUIInstalled = $true
 }
@@ -311,6 +345,35 @@ try {
     Write-Warn "Test didn't complete. Ollama may still be loading the model."
     Write-Warn "Try manually in a terminal: ollama run gemma3:12b"
 }
+
+# ── Verify Security ──
+Write-Host ""
+Write-Info "Verifying network security..."
+
+# Check Ollama bind address
+try {
+    $ollamaListeners = netstat -an 2>$null | Select-String ":11434" | Select-String "LISTENING"
+    if ($ollamaListeners -and $ollamaListeners -match "127\.0\.0\.1") {
+        Write-Ok "Ollama bound to localhost only (127.0.0.1:11434)"
+    } elseif ($ollamaListeners -and $ollamaListeners -match "0\.0\.0\.0") {
+        Write-Warn "Ollama is listening on all interfaces (0.0.0.0:11434)"
+        Write-Warn "Set OLLAMA_HOST=127.0.0.1:11434 in user environment variables to restrict."
+    } else {
+        Write-Info "Could not verify Ollama bind address. Check: netstat -an | findstr 11434"
+    }
+} catch {
+    Write-Info "Could not verify bind addresses."
+}
+
+# Check Open WebUI bind address
+try {
+    $webuiListeners = netstat -an 2>$null | Select-String ":3000" | Select-String "LISTENING"
+    if ($webuiListeners -and $webuiListeners -match "127\.0\.0\.1") {
+        Write-Ok "Open WebUI bound to localhost only (127.0.0.1:3000)"
+    } elseif ($webuiListeners) {
+        Write-Warn "Could not verify Open WebUI bind address. Check: netstat -an | findstr 3000"
+    }
+} catch {}
 
 # ── Done ──
 Write-Host ""
