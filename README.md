@@ -455,9 +455,54 @@ Then in Open WebUI: **Admin Panel → Settings → Documents → Content Extract
 
 ---
 
+## After a Restart
+
+Everything is set to auto-start, but if the chat interface isn't loading after a reboot:
+
+### Windows
+
+1. **Check Ollama** — look for the Ollama icon in your system tray (bottom-right, near the clock). If it's not there, open **Ollama** from the Start menu.
+2. **Check Docker** — look for the Docker whale icon in your system tray. If it's not there, open **Docker Desktop** from the Start menu. Wait until the whale icon stops animating (this can take 1-2 minutes).
+3. **Open the chat** — go to **http://localhost:3000** in your browser.
+
+If localhost:3000 still doesn't load after both are running, open PowerShell and run:
+
+```powershell
+docker start open-webui
+```
+
+Then refresh the browser.
+
+### Linux
+
+Both services auto-start on boot. If something's not working:
+
+```bash
+sudo systemctl start ollama      # start the model server
+docker start open-webui          # start the chat interface
+```
+
+Then open **http://localhost:3000**.
+
+---
+
 ## Managing the System
 
 ### Start/Stop
+
+**Windows:**
+
+```powershell
+# Start (if not auto-started)
+# Open Ollama and Docker Desktop from Start menu, then:
+docker start open-webui
+
+# Stop
+docker stop open-webui
+# Right-click Ollama tray icon -> Quit
+```
+
+**Linux:**
 
 ```bash
 # Models (Ollama)
@@ -471,6 +516,10 @@ docker stop open-webui          # stop
 ```
 
 Both are set to auto-start on boot. To disable auto-start:
+
+**Windows:** Docker Desktop -> Settings -> General -> uncheck "Start Docker Desktop when you sign in". For Ollama, remove it from Windows startup apps (Settings -> Apps -> Startup).
+
+**Linux:**
 
 ```bash
 sudo systemctl disable ollama
