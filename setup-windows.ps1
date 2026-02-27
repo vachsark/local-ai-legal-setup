@@ -7,16 +7,23 @@
 #   1. Ollama (local AI model server with GPU acceleration)
 #   2. Open WebUI (ChatGPT-like browser interface via Docker)
 #   3. Recommended models for legal work
+#   4. Legal preset models with specialized system prompts
+#   5. RAG (document upload) with legal-optimized settings
 #
 # Usage:
 #   1. Open PowerShell as Administrator
-#   2. If needed: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-#   3. Run: .\setup-windows.ps1
+#   2. Run: powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
+#
+# If you get "running scripts is disabled on this system":
+#   - Right-click this file → Properties → check "Unblock" → OK
+#   - Or run: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 #
 # After setup, all AI inference runs locally. No data leaves your machine.
 # ============================================================================
 
 $ErrorActionPreference = "Stop"
+
+$scriptDir = $PSScriptRoot
 
 # ── Helpers ──
 function Write-Step { param($num, $msg) Write-Host "`n── Step $num ──" -ForegroundColor White; Write-Host "  $msg" -ForegroundColor Cyan }
@@ -43,7 +50,7 @@ Write-Host ""
 Write-Host "This will install:"
 Write-Host "  - Ollama (AI model server with GPU acceleration)"
 Write-Host "  - Docker Desktop + Open WebUI (browser-based chat interface)"
-Write-Host "  - 3 language models optimized for legal work (~31GB download)"
+Write-Host "  - 3 language models, 3 legal presets, and an embedding model (~32GB download)"
 Write-Host ""
 Write-Host "Estimated time: 20-40 minutes (depending on internet speed)"
 Write-Host "Disk space needed: ~40GB"
@@ -52,7 +59,7 @@ $confirm = Read-Host "Continue? [Y/n]"
 if ($confirm -and $confirm -notmatch '^[Yy]') { Write-Host "Aborted."; exit 0 }
 
 # ── Step 1: Check GPU ──
-Write-Step "1/7" "Checking hardware"
+Write-Step "1/8" "Checking hardware"
 
 $gpu = Get-CimInstance -ClassName Win32_VideoController | Select-Object -ExpandProperty Name
 $hasNvidia = $gpu | Where-Object { $_ -match "NVIDIA" }
@@ -89,7 +96,7 @@ try {
 }
 
 # ── Step 2: Install Ollama ──
-Write-Step "2/7" "Installing Ollama"
+Write-Step "2/8" "Installing Ollama"
 
 $ollamaPath = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
 $ollamaInPath = Get-Command ollama -ErrorAction SilentlyContinue
@@ -139,7 +146,7 @@ if ($ollamaInPath -or (Test-Path $ollamaPath)) {
 }
 
 # ── Step 3: Configure GPU tuning ──
-Write-Step "3/7" "Configuring GPU acceleration"
+Write-Step "3/8" "Configuring GPU acceleration"
 
 # Set environment variables for Ollama performance tuning
 $envVars = @{
@@ -173,7 +180,7 @@ if ($gpuType -eq "amd") {
 }
 
 # ── Step 4: Start Ollama and wait ──
-Write-Step "4/7" "Starting Ollama"
+Write-Step "4/8" "Starting Ollama"
 
 # Check if Ollama is already running
 $ollamaRunning = $false
@@ -216,13 +223,14 @@ if (-not $ollamaRunning) {
 Write-Ok "Ollama is running"
 
 # ── Step 5: Pull Models ──
-Write-Step "5/7" "Downloading AI models (this takes a while)"
+Write-Step "5/8" "Downloading AI models (this takes a while)"
 
 Write-Host ""
-Write-Host "  Pulling 3 models optimized for legal work:"
-Write-Host "    1. gemma3:12b    (8GB)  - Fast, great for summarization and drafting"
-Write-Host "    2. qwen3:14b     (9GB)  - Strong instruction following, structured analysis"
-Write-Host "    3. mistral-small (14GB)  - Most capable, best for complex reasoning"
+Write-Host "  Pulling 3 models for legal work + embedding model for document search:"
+Write-Host "    1. gemma3:12b       (8GB)   - Fast, great for summarization and drafting"
+Write-Host "    2. qwen3:14b        (9GB)   - Strong instruction following, structured analysis"
+Write-Host "    3. mistral-small    (14GB)  - Most capable, best for complex reasoning"
+Write-Host "    4. nomic-embed-text (274MB) - Embedding model for document upload (RAG)"
 Write-Host ""
 
 $models = @("gemma3:12b", "qwen3:14b")
@@ -234,6 +242,9 @@ if ($vramGB -ge 12 -or $vramGB -eq 0) {
     Write-Warn "Skipping mistral-small:24b (needs 14GB VRAM, you have ${vramGB}GB)"
 }
 
+# Always pull embedding model (small, needed for RAG)
+$models += "nomic-embed-text"
+
 foreach ($model in $models) {
     Write-Info "Pulling $model..."
     & ollama pull $model
@@ -244,8 +255,35 @@ foreach ($model in $models) {
     }
 }
 
-# ── Step 6: Install Docker Desktop + Open WebUI ──
-Write-Step "6/7" "Installing Open WebUI (chat interface)"
+# ── Step 6: Create Legal Presets ──
+Write-Step "6/8" "Creating legal presets (specialized models)"
+
+Write-Info "Building legal-tuned model presets from Modelfiles..."
+
+$modelfiles = @("contract-reviewer", "depo-summarizer", "memo-drafter")
+
+foreach ($name in $modelfiles) {
+    $modelfile = Join-Path $scriptDir "Modelfile.$name"
+    if (Test-Path $modelfile) {
+        $existing = ollama list 2>$null | Select-String $name
+        if ($existing) {
+            Write-Ok "$name already exists"
+        } else {
+            Write-Info "Creating $name..."
+            & ollama create $name -f $modelfile
+            if ($LASTEXITCODE -eq 0) {
+                Write-Ok "$name ready"
+            } else {
+                Write-Warn "Failed to create $name — you can try later with: ollama create $name -f $modelfile"
+            }
+        }
+    } else {
+        Write-Warn "Modelfile.$name not found in $scriptDir — skipping"
+    }
+}
+
+# ── Step 7: Install Docker Desktop + Open WebUI ──
+Write-Step "7/8" "Installing Open WebUI (chat interface)"
 
 $dockerAvailable = Get-Command docker -ErrorAction SilentlyContinue
 
@@ -301,23 +339,30 @@ if (-not $dockerAvailable) {
         Write-Ok "Open WebUI container already exists"
         docker start open-webui 2>$null
     } else {
-        Write-Info "Starting Open WebUI container..."
+        Write-Info "Starting Open WebUI container (with RAG document support)..."
         # Pin to a specific release tag for supply chain safety
         # Bind to 127.0.0.1 only — not accessible from other machines on the network
         docker run -d `
             -p 127.0.0.1:3000:8080 `
             --add-host=host.docker.internal:host-gateway `
             -v open-webui:/app/backend/data `
+            -e OLLAMA_BASE_URL=http://host.docker.internal:11434 `
+            -e RAG_EMBEDDING_ENGINE=ollama `
+            -e RAG_EMBEDDING_MODEL=nomic-embed-text `
+            -e CHUNK_SIZE=512 `
+            -e CHUNK_OVERLAP=75 `
+            -e ENABLE_RAG_HYBRID_SEARCH=true `
+            -e RAG_SYSTEM_CONTEXT=true `
             --name open-webui `
             --restart always `
             ghcr.io/open-webui/open-webui:v0.6.5
-        Write-Ok "Open WebUI is running (localhost only)"
+        Write-Ok "Open WebUI is running (localhost only, RAG enabled)"
     }
     $webUIInstalled = $true
 }
 
-# ── Step 7: Quick Test ──
-Write-Step "7/7" "Running quick test"
+# ── Step 8: Quick Test ──
+Write-Step "8/8" "Running quick test"
 
 Write-Info "Testing gemma3:12b with a simple legal prompt..."
 Write-Host ""
@@ -405,7 +450,15 @@ if ($vramGB -ge 12 -or $vramGB -eq 0) {
     Write-Host "    - mistral-small   Complex reasoning, best quality (slower)"
 }
 Write-Host ""
-Write-Host "  See README.md for example prompts and limitations." -ForegroundColor Gray
+Write-Host "  Legal presets (specialized system prompts):" -ForegroundColor White
+Write-Host "    - contract-reviewer  Contract analysis (qwen3:14b)"
+Write-Host "    - depo-summarizer    Deposition summaries (gemma3:12b)"
+Write-Host "    - memo-drafter       Legal memo drafting (mistral-small)"
+Write-Host ""
+Write-Host "  Document upload: Create a Knowledge collection in Open WebUI," -ForegroundColor Gray
+Write-Host "  upload PDFs, then reference them with # in chat. See README.md." -ForegroundColor Gray
+Write-Host ""
+Write-Host "  See README.md for example prompts, limitations, and RAG tips." -ForegroundColor Gray
 Write-Host ""
 Write-Host "  IMPORTANT: These models are not as accurate as GPT-4 or Claude." -ForegroundColor Yellow
 Write-Host "  Always verify outputs, especially case citations and legal claims." -ForegroundColor Yellow

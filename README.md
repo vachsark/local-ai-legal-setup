@@ -19,12 +19,13 @@ chmod +x setup.sh
 ### Windows
 
 ```powershell
-# Open PowerShell as Administrator
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-.\setup-windows.ps1
+# Open PowerShell as Administrator, then run:
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
 
-The script installs everything, downloads 3 models (~31GB), and starts the chat interface. Takes 15-30 minutes depending on internet speed.
+> **Getting an error?** Windows blocks scripts downloaded from the internet by default. The command above bypasses this for the single script run. Alternatively, right-click the `.ps1` file → Properties → check "Unblock" → OK, then run `.\setup-windows.ps1` normally.
+
+The script installs everything, downloads 3 models + 3 legal presets (~32GB), and starts the chat interface. Takes 15-30 minutes depending on internet speed.
 
 When done, open **http://localhost:3000** in your browser.
 
@@ -257,6 +258,196 @@ First response not great? Don't start over. Say:
 - "Expand on point 3 — that's the key issue"
 - "Too formal. Rewrite in a more conversational tone for the client"
 - "You missed [X]. Add analysis of that factor"
+
+---
+
+## Document Upload (RAG)
+
+Open WebUI has built-in document upload and retrieval. Upload contracts, depositions, or any legal document as a PDF, and the model can reference it during your conversation.
+
+### How It Works
+
+1. **Create a Knowledge Collection**: In Open WebUI, click your name (top-left) → Knowledge → Create. Name it by case or matter (e.g., "Smith v. Jones Discovery" or "ABC Corp Lease Review").
+
+2. **Upload Documents**: Add PDFs, Word docs, or text files to the collection. Each document is automatically split into chunks and indexed for search.
+
+3. **Reference in Chat**: Start a new chat, type `#` and select your collection. The model will search the uploaded documents to answer your questions.
+
+### About Chunk Size
+
+Documents are split into 512-token chunks with 75-token overlap. This means:
+
+- A typical contract clause (1-2 paragraphs) stays in one chunk — the model sees the full clause
+- Cross-references between adjacent sections are captured in the overlap
+- Both keyword and semantic search are used to find relevant chunks (hybrid search)
+
+For short documents (under 5 pages), toggle **Full Context Mode** (in the chat settings) to feed the entire document to the model instead of just matching chunks.
+
+### Scanned PDFs
+
+Standard text-based PDFs work immediately. Scanned PDFs (images of paper) need OCR first — see the optional Docling section below.
+
+---
+
+## Legal Presets
+
+The setup script creates 3 specialized models that appear in the Open WebUI dropdown alongside the base models. Each has a tuned system prompt for a specific legal task.
+
+### contract-reviewer (based on qwen3:14b)
+
+**Use for**: Reviewing contracts, clauses, and agreements
+
+Analyzes obligations, risks, ambiguities, and missing protections. Best paired with RAG — upload a contract to a Knowledge collection, then ask the contract-reviewer to analyze specific sections.
+
+### depo-summarizer (based on gemma3:12b)
+
+**Use for**: Summarizing depositions and witness testimony
+
+Organizes summaries by topic (not chronologically), includes page:line references, flags contradictions and key admissions. Fast enough to process deposition excerpts iteratively.
+
+### memo-drafter (based on mistral-small:24b)
+
+**Use for**: Drafting legal memoranda and analysis
+
+Uses IRAC structure (Issue, Rule, Application, Conclusion) and standard memo format. Slower but produces the most thorough analysis. Best for final work product.
+
+### When to Use Presets vs. Base Models
+
+| Task                              | Use                                               |
+| --------------------------------- | ------------------------------------------------- |
+| Quick question, general drafting  | Base model (gemma3:12b)                           |
+| Contract review with uploaded PDF | contract-reviewer                                 |
+| Deposition summary                | depo-summarizer                                   |
+| Formal memo or detailed analysis  | memo-drafter                                      |
+| Anything else                     | Start with base model, switch to preset if needed |
+
+---
+
+## Tips for Document Upload (RAG)
+
+### Organize by Case or Matter
+
+Create separate Knowledge collections for each case or matter. This keeps searches focused — when you reference `#smith-v-jones`, the model only searches documents in that collection, not your entire upload history.
+
+### Upload Before Chatting
+
+Upload all relevant documents to a collection first, then start your chat. The model can only reference documents that were in the collection when the chat started.
+
+### Use `#` to Scope Your Query
+
+Type `#` in the chat to select which collection to search. You can reference multiple collections in one chat if needed.
+
+### Full Context Mode for Short Documents
+
+For documents under ~5 pages, toggle **Full Context Mode** in chat settings. This sends the entire document to the model instead of just the most relevant chunks. Better for short contracts where every clause matters.
+
+### Break Up Very Large Files
+
+If a document is over 50 pages, consider splitting it into logical sections (e.g., separate the exhibits from the main agreement) and uploading each as a separate file in the same collection. This improves retrieval accuracy.
+
+---
+
+## Demo: Contract Review Walkthrough
+
+Here's a complete walkthrough using the contract-reviewer preset with document upload. Follow along after setup to see everything working.
+
+### 1. Pull Up Open WebUI
+
+Open **http://localhost:3000** and log in (or create your first account).
+
+### 2. Create a Knowledge Collection
+
+- Click your name (bottom-left) → **Knowledge** → **+ Create**
+- Name it: `ABC Corp Lease`
+- Click **Create**
+
+### 3. Upload a Document
+
+- In the `ABC Corp Lease` collection, click **+ Add Content** → **Upload Files**
+- Upload your contract PDF (or any text-based PDF you have handy)
+- Wait for the green checkmark — this means it's been chunked and embedded
+
+### 4. Start a Chat with the Contract Reviewer
+
+- Click **New Chat** (top-left)
+- In the model dropdown, select **contract-reviewer**
+- In the message box, type `#` — a popup appears listing your Knowledge collections
+- Select `ABC Corp Lease`
+
+### 5. Ask Questions
+
+Try these prompts (the model will pull relevant chunks from your uploaded contract):
+
+```
+What are the key obligations for each party under this agreement?
+```
+
+```
+Identify any clauses that create open-ended liability exposure.
+```
+
+```
+Are there any missing protections that are standard in commercial leases
+but absent from this document?
+```
+
+```
+Summarize the termination provisions. Under what conditions can either
+party exit early, and what are the penalties?
+```
+
+### 6. Try the Other Presets
+
+Switch models in the dropdown to try different tasks on the same document:
+
+- **depo-summarizer**: "Summarize the key terms and dates in this agreement, organized by topic"
+- **memo-drafter**: "Draft a memo analyzing whether the indemnification clause in this lease adequately protects our client as tenant"
+
+### What You Should See
+
+- The model's response includes references to specific language from your uploaded document
+- Responses from presets are more focused than base models (the system prompt guides the analysis)
+- Hybrid search finds relevant sections even if your question uses different words than the contract
+- Follow-up questions are fast (RAG context is cached in the system message)
+
+> **Tip**: If the model doesn't seem to reference your document, make sure you selected the collection with `#` before sending your first message. The `#` tag scopes the search to that collection.
+
+---
+
+## Optional: Community Tools
+
+Open WebUI supports community-built tools that extend model capabilities (web search, calculators, document formatters, etc.).
+
+Browse available tools at **https://openwebui.com/tools**
+
+To install a tool:
+
+1. Find a tool on the marketplace
+2. Copy its URL
+3. In Open WebUI: your name → Settings → Tools → Import from URL
+4. Enable the tool in your chat settings
+
+No tools are installed by default. Only install tools you trust — they run locally but execute code within the Open WebUI environment.
+
+---
+
+## Optional: Scanned PDF Support (Docling)
+
+Standard text-based PDFs work with RAG out of the box. But scanned depositions, exhibits, and older documents (image-based PDFs) need OCR to extract text first.
+
+[Docling](https://github.com/DS4SD/docling) handles this. It runs as a separate Docker container:
+
+```bash
+docker run -d \
+    -p 127.0.0.1:5001:5001 \
+    --name docling \
+    --restart unless-stopped \
+    quay.io/docling-project/docling-serve
+```
+
+Then in Open WebUI: **Admin Panel → Settings → Documents → Content Extraction Engine** → set to **Docling** and enter `http://host.docker.internal:5001`.
+
+**Note**: Docling requires ~4GB RAM and takes 30-60 seconds per page for OCR. Only set this up if you regularly work with scanned documents.
 
 ---
 

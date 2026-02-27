@@ -7,7 +7,9 @@
 #   1. Ollama (local AI model server with GPU acceleration)
 #   2. Open WebUI (ChatGPT-like browser interface)
 #   3. Recommended models for legal work
-#   4. GPU tuning for optimal performance
+#   4. Legal preset models with specialized system prompts
+#   5. RAG (document upload) with legal-optimized settings
+#   6. GPU tuning for optimal performance
 #
 # Usage:
 #   chmod +x setup.sh
@@ -17,6 +19,8 @@
 # ============================================================================
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Colors ──
 RED='\033[0;31m'
@@ -42,7 +46,7 @@ echo -e "${NC}"
 echo "This will install:"
 echo "  - Ollama (AI model server with GPU acceleration)"
 echo "  - Open WebUI (browser-based chat interface)"
-echo "  - 3 language models optimized for legal work (~31GB download)"
+echo "  - 3 language models, 3 legal presets, and an embedding model (~32GB download)"
 echo ""
 echo "Estimated time: 15-30 minutes (depending on internet speed)"
 echo "Disk space needed: ~35GB"
@@ -51,7 +55,7 @@ read -p "Continue? [Y/n] " confirm
 [[ "${confirm:-Y}" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
 # ── Check for AMD GPU ──
-step "1/7: Checking hardware"
+step "1/8: Checking hardware"
 
 if lspci 2>/dev/null | grep -qi "VGA.*AMD\|Display.*AMD"; then
     gpu_name=$(lspci | grep -iE "VGA|Display" | grep -i AMD | head -1 | sed 's/.*: //')
@@ -74,7 +78,7 @@ else
 fi
 
 # ── Install Ollama ──
-step "2/7: Installing Ollama"
+step "2/8: Installing Ollama"
 
 if command -v ollama &>/dev/null; then
     ok "Ollama already installed: $(ollama --version 2>/dev/null || echo 'version unknown')"
@@ -108,7 +112,7 @@ else
 fi
 
 # ── Configure Vulkan Backend & Tuning ──
-step "3/7: Configuring GPU acceleration"
+step "3/8: Configuring GPU acceleration"
 
 info "Setting up Vulkan (RADV) backend and performance tuning..."
 
@@ -161,16 +165,17 @@ for i in $(seq 1 30); do
 done
 
 # ── Pull Models ──
-step "4/7: Downloading AI models (this takes a while)"
+step "4/8: Downloading AI models (this takes a while)"
 
 echo ""
-echo "Pulling 3 models optimized for legal work:"
-echo "  1. gemma3:12b   (8GB)  — Fast, great for summarization and drafting"
-echo "  2. qwen3:14b    (9GB)  — Strong instruction following, structured analysis"
-echo "  3. mistral-small (14GB) — Most capable, best for complex reasoning"
+echo "Pulling 3 models for legal work + embedding model for document search:"
+echo "  1. gemma3:12b       (8GB)   — Fast, great for summarization and drafting"
+echo "  2. qwen3:14b        (9GB)   — Strong instruction following, structured analysis"
+echo "  3. mistral-small    (14GB)  — Most capable, best for complex reasoning"
+echo "  4. nomic-embed-text (274MB) — Embedding model for document upload (RAG)"
 echo ""
 
-models=("gemma3:12b" "qwen3:14b" "mistral-small:24b")
+models=("gemma3:12b" "qwen3:14b" "mistral-small:24b" "nomic-embed-text")
 
 for model in "${models[@]}"; do
     if ollama list 2>/dev/null | grep -q "$(echo "$model" | cut -d: -f1)"; then
@@ -182,8 +187,30 @@ for model in "${models[@]}"; do
     fi
 done
 
+# ── Create Legal Presets ──
+step "5/8: Creating legal presets (specialized models)"
+
+info "Building legal-tuned model presets from Modelfiles..."
+
+modelfiles=("contract-reviewer" "depo-summarizer" "memo-drafter")
+
+for name in "${modelfiles[@]}"; do
+    modelfile="$SCRIPT_DIR/Modelfile.$name"
+    if [[ -f "$modelfile" ]]; then
+        if ollama list 2>/dev/null | grep -q "$name"; then
+            ok "$name already exists"
+        else
+            info "Creating $name..."
+            ollama create "$name" -f "$modelfile"
+            ok "$name ready"
+        fi
+    else
+        warn "Modelfile.$name not found in $SCRIPT_DIR — skipping"
+    fi
+done
+
 # ── Install Docker (if needed for Open WebUI) ──
-step "5/7: Setting up Docker"
+step "6/8: Setting up Docker"
 
 if command -v docker &>/dev/null; then
     ok "Docker already installed"
@@ -224,7 +251,7 @@ if ! docker info &>/dev/null 2>&1; then
 fi
 
 # ── Install Open WebUI ──
-step "6/7: Installing Open WebUI (chat interface)"
+step "7/8: Installing Open WebUI (chat interface)"
 
 # Pin to a specific release tag for supply chain safety
 OPEN_WEBUI_IMAGE="ghcr.io/open-webui/open-webui:v0.6.5"
@@ -234,16 +261,23 @@ if [[ ${#DOCKER_CMD[@]} -gt 0 ]]; then
         ok "Open WebUI container already exists"
         "${DOCKER_CMD[@]}" start open-webui 2>/dev/null || true
     else
-        info "Starting Open WebUI container..."
+        info "Starting Open WebUI container (with RAG document support)..."
         # Bind to 127.0.0.1 only — not accessible from other machines on the network
         "${DOCKER_CMD[@]}" run -d \
             -p 127.0.0.1:3000:8080 \
             --add-host=host.docker.internal:host-gateway \
             -v open-webui:/app/backend/data \
+            -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+            -e RAG_EMBEDDING_ENGINE=ollama \
+            -e RAG_EMBEDDING_MODEL=nomic-embed-text \
+            -e CHUNK_SIZE=512 \
+            -e CHUNK_OVERLAP=75 \
+            -e ENABLE_RAG_HYBRID_SEARCH=true \
+            -e RAG_SYSTEM_CONTEXT=true \
             --name open-webui \
             --restart always \
             "$OPEN_WEBUI_IMAGE"
-        ok "Open WebUI is running (localhost only)"
+        ok "Open WebUI is running (localhost only, RAG enabled)"
     fi
 else
     warn "Docker not available. Install Open WebUI manually:"
@@ -251,7 +285,7 @@ else
 fi
 
 # ── Quick Test ──
-step "7/7: Running quick test"
+step "8/8: Running quick test"
 
 info "Testing gemma3:12b with a simple legal prompt..."
 echo ""
@@ -309,8 +343,17 @@ echo "  - gemma3:12b      Fast daily work, summaries, drafting"
 echo "  - qwen3:14b       Structured analysis, detailed responses"
 echo "  - mistral-small   Complex reasoning, best quality (slower)"
 echo ""
+echo "Legal presets (specialized system prompts):"
+echo "  - contract-reviewer  Contract analysis (qwen3:14b)"
+echo "  - depo-summarizer    Deposition summaries (gemma3:12b)"
+echo "  - memo-drafter       Legal memo drafting (mistral-small)"
+echo ""
+echo "Document upload: Create a Knowledge collection in Open WebUI,"
+echo "upload PDFs, then reference them with # in chat. See README.md."
+echo ""
 echo "See README.md for:"
-echo "  - How to use each model effectively"
+echo "  - How to use document upload (RAG)"
+echo "  - Legal preset details and when to use each"
 echo "  - Example prompts for legal work"
 echo "  - Important limitations to understand"
 echo "  - Troubleshooting tips"
