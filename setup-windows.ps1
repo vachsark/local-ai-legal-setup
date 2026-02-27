@@ -104,14 +104,18 @@ $ollamaInPath = Get-Command ollama -ErrorAction SilentlyContinue
 if ($ollamaInPath -or (Test-Path $ollamaPath)) {
     Write-Ok "Ollama already installed"
 } else {
-    Write-Info "Downloading Ollama installer..."
+    Write-Info "Downloading Ollama installer (this may take a minute)..."
 
     $installerUrl = "https://ollama.com/download/OllamaSetup.exe"
     $randomSuffix = [System.IO.Path]::GetRandomFileName().Replace(".", "")
     $installerPath = "$env:TEMP\OllamaSetup-$randomSuffix.exe"
 
     try {
+        # Disable progress bar -- PowerShell 5.1's progress stream makes downloads 10-100x slower
+        $oldProgress = $ProgressPreference
+        $ProgressPreference = 'SilentlyContinue'
         Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+        $ProgressPreference = $oldProgress
 
         # Verify the downloaded file has a valid Authenticode signature
         $sig = Get-AuthenticodeSignature -FilePath $installerPath
