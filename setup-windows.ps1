@@ -132,9 +132,30 @@ if ($ollamaInPath -or (Test-Path $ollamaPath)) {
             }
         }
 
-        Write-Info "Running Ollama installer (follow the prompts if any appear)..."
-        Start-Process -FilePath $installerPath -Wait
-        Write-Ok "Ollama installed"
+        Write-Info "Running Ollama installer..."
+        Start-Process -FilePath $installerPath
+
+        # Don't use -Wait -- Ollama auto-launches as a tray app after install,
+        # which keeps the installer process alive and hangs the script forever.
+        # Instead, poll for ollama.exe to appear in PATH.
+        Write-Info "Waiting for installation to complete..."
+        $attempts = 0
+        while ($attempts -lt 60) {
+            Start-Sleep -Seconds 3
+            # Refresh PATH so we can find newly installed ollama
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+            if (Get-Command ollama -ErrorAction SilentlyContinue) {
+                break
+            }
+            $attempts++
+        }
+
+        if (Get-Command ollama -ErrorAction SilentlyContinue) {
+            Write-Ok "Ollama installed"
+        } else {
+            Write-Err "Ollama not found after 3 minutes. Complete the installer manually, then re-run this script."
+            exit 1
+        }
     } catch {
         Write-Err "Failed to download Ollama. Please install manually from https://ollama.com/download"
         Write-Host "After installing Ollama, run this script again."
