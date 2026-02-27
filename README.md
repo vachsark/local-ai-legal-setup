@@ -269,13 +269,48 @@ First response not great? Don't start over. Say:
 
 Open WebUI has built-in document upload and retrieval. Upload contracts, depositions, or any legal document as a PDF, and the model can reference it during your conversation.
 
-### How It Works
+There are two ways to use documents:
 
-1. **Create a Knowledge Collection**: In Open WebUI, click your name (top-left) → Knowledge → Create. Name it by case or matter (e.g., "Smith v. Jones Discovery" or "ABC Corp Lease Review").
+### Method 1: In-Chat Upload (Quick, Temporary)
+
+Click the **attachment icon** (paperclip) in the chat input to upload a file directly into the conversation. The model processes it on the spot and can answer questions about it.
+
+- **Scope**: Only available in that specific chat session
+- **Best for**: Quick one-off questions about a single document
+- **Limitation**: If you start a new chat, you'll need to upload again
+
+### Method 2: Knowledge Collections (Persistent, Recommended)
+
+Knowledge collections are permanent document libraries that you can reference from any chat.
+
+1. **Create a Collection**: Click your name (top-left) → Knowledge → Create. Name it by case or matter (e.g., "Smith v. Jones Discovery" or "ABC Corp Lease Review").
 
 2. **Upload Documents**: Add PDFs, Word docs, or text files to the collection. Each document is automatically split into chunks and indexed for search.
 
 3. **Reference in Chat**: Start a new chat, type `#` and select your collection. The model will search the uploaded documents to answer your questions.
+
+- **Scope**: Available across all chats — just type `#` to reference
+- **Best for**: Case files, matters, or any documents you'll reference repeatedly
+- **Tip**: Organize by case or matter. You can reference multiple collections in one chat.
+
+### Practical Limits
+
+This setup runs on your local machine, so document capacity depends on your hardware:
+
+| Scale                             | What works well                                                                                |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **1-50 documents per collection** | Great performance. This is the sweet spot for a single matter or case.                         |
+| **50-200 documents total**        | Works well across multiple collections. Search stays fast.                                     |
+| **200-500 documents total**       | Still functional but search may slow down. Consider splitting into focused collections.        |
+| **500+ documents**                | You'll hit practical limits. Embeddings take longer, search accuracy drops as the index grows. |
+
+**For large-scale document review** (thousands of documents, full case databases), you'd need a dedicated document management system or a server with more RAM and storage. This setup is designed for active working documents — the contracts, depositions, and memos you're actively analyzing, not long-term archival.
+
+**Tips for best results**:
+
+- Upload the specific documents relevant to your current work, not everything in the case
+- Keep collections focused (e.g., "Smith Depositions" and "Smith Contracts" rather than one giant "Smith" collection)
+- Remove documents from collections when you're done with them to keep search fast
 
 ### About Chunk Size
 
