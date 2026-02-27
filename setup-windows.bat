@@ -1,12 +1,20 @@
 @echo off
 title Local AI Setup for Legal Work
+
+:: Check if already running as admin
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Requesting administrator access...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit /b
+)
+
 echo ============================================
 echo   Local AI Setup for Legal Work
 echo   Windows Launcher
 echo ============================================
 echo.
 echo This will open the setup script in PowerShell.
-echo If prompted by Windows security, click "Yes" to allow.
 echo.
 pause
 
