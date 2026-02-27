@@ -81,9 +81,26 @@ if ($hasNvidia) {
 }
 
 # Check VRAM
+# Win32_VideoController.AdapterRAM is a 32-bit uint -- overflows above 4GB.
+# The registry stores the real value as a 64-bit qword.
 try {
-    $vram = Get-CimInstance -ClassName Win32_VideoController | Select-Object -First 1 -ExpandProperty AdapterRAM
-    $vramGB = [math]::Round($vram / 1GB, 1)
+    $vramGB = 0
+    $regPath = "HKLM:\SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+    $subkeys = Get-ChildItem $regPath -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^\d+$' }
+    foreach ($key in $subkeys) {
+        $qwMem = (Get-ItemProperty $key.PSPath -ErrorAction SilentlyContinue).'HardwareInformation.qwMemorySize'
+        if ($qwMem -and $qwMem -gt 0) {
+            $candidate = [math]::Round($qwMem / 1GB, 1)
+            if ($candidate -gt $vramGB) { $vramGB = $candidate }
+        }
+    }
+
+    # Fallback to WMI if registry didn't work (still wrong for >4GB, but better than nothing)
+    if ($vramGB -eq 0) {
+        $vram = Get-CimInstance -ClassName Win32_VideoController | Select-Object -First 1 -ExpandProperty AdapterRAM
+        $vramGB = [math]::Round($vram / 1GB, 1)
+    }
+
     if ($vramGB -gt 0) {
         Write-Info "VRAM: ${vramGB}GB"
         if ($vramGB -lt 12) {
