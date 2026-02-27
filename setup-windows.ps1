@@ -375,32 +375,78 @@ if (-not $dockerAvailable) {
         $webUIInstalled = $false
     }
 } else {
-    # Docker is available --use it
-    $existing = docker ps -a --format "{{.Names}}" 2>$null | Where-Object { $_ -eq "open-webui" }
-    if ($existing) {
-        Write-Ok "Open WebUI container already exists"
-        docker start open-webui 2>$null
-    } else {
-        Write-Info "Starting Open WebUI container (with RAG document support)..."
-        # Pin to a specific release tag for supply chain safety
-        # Bind to 127.0.0.1 only --not accessible from other machines on the network
-        docker run -d `
-            -p 127.0.0.1:3000:8080 `
-            --add-host=host.docker.internal:host-gateway `
-            -v open-webui:/app/backend/data `
-            -e OLLAMA_BASE_URL=http://host.docker.internal:11434 `
-            -e RAG_EMBEDDING_ENGINE=ollama `
-            -e RAG_EMBEDDING_MODEL=nomic-embed-text `
-            -e CHUNK_SIZE=512 `
-            -e CHUNK_OVERLAP=75 `
-            -e ENABLE_RAG_HYBRID_SEARCH=true `
-            -e RAG_SYSTEM_CONTEXT=true `
-            --name open-webui `
-            --restart always `
-            ghcr.io/open-webui/open-webui:v0.6.5
-        Write-Ok "Open WebUI is running (localhost only, RAG enabled)"
+    # Docker command exists -- but is the daemon running?
+    $dockerRunning = $false
+    try {
+        $dockerInfo = docker info 2>&1
+        if ($LASTEXITCODE -eq 0) { $dockerRunning = $true }
+    } catch {}
+
+    if (-not $dockerRunning) {
+        Write-Warn "Docker is installed but the Docker daemon is not running."
+        Write-Warn "Please start Docker Desktop from the Start menu, wait for it to finish loading,"
+        Write-Warn "then press Enter to continue."
+        Write-Host ""
+        Read-Host "Press Enter after Docker Desktop is running (or type 'skip' to use pip instead)"
+
+        # Check again
+        try {
+            $dockerInfo = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) { $dockerRunning = $true }
+        } catch {}
     }
-    $webUIInstalled = $true
+
+    if ($dockerRunning) {
+        $existing = docker ps -a --format "{{.Names}}" 2>$null | Where-Object { $_ -eq "open-webui" }
+        if ($existing) {
+            Write-Ok "Open WebUI container already exists"
+            docker start open-webui 2>$null
+        } else {
+            Write-Info "Starting Open WebUI container (with RAG document support)..."
+            # Pin to a specific release tag for supply chain safety
+            # Bind to 127.0.0.1 only --not accessible from other machines on the network
+            docker run -d `
+                -p 127.0.0.1:3000:8080 `
+                --add-host=host.docker.internal:host-gateway `
+                -v open-webui:/app/backend/data `
+                -e OLLAMA_BASE_URL=http://host.docker.internal:11434 `
+                -e RAG_EMBEDDING_ENGINE=ollama `
+                -e RAG_EMBEDDING_MODEL=nomic-embed-text `
+                -e CHUNK_SIZE=512 `
+                -e CHUNK_OVERLAP=75 `
+                -e ENABLE_RAG_HYBRID_SEARCH=true `
+                -e RAG_SYSTEM_CONTEXT=true `
+                --name open-webui `
+                --restart always `
+                ghcr.io/open-webui/open-webui:v0.6.5
+            Write-Ok "Open WebUI is running (localhost only, RAG enabled)"
+        }
+        $webUIInstalled = $true
+    } else {
+        Write-Warn "Docker daemon still not running. Falling back to pip install..."
+        $pipAvailable = Get-Command pip -ErrorAction SilentlyContinue
+        if ($pipAvailable) {
+            Write-Info "Installing Open WebUI via pip (in a virtual environment)..."
+            $venvPath = "$env:USERPROFILE\.open-webui-venv"
+            & python -m venv $venvPath
+            & "$venvPath\Scripts\pip.exe" install open-webui
+            if ($LASTEXITCODE -eq 0) {
+                Write-Ok "Open WebUI installed via pip (venv: $venvPath)"
+                Write-Info "Starting Open WebUI (bound to localhost)..."
+                Start-Process -FilePath "$venvPath\Scripts\open-webui.exe" -ArgumentList "serve", "--host", "127.0.0.1", "--port", "3000" -WindowStyle Hidden
+                Start-Sleep -Seconds 5
+                Write-Ok "Open WebUI is running (localhost only)"
+                $webUIInstalled = $true
+            } else {
+                Write-Warn "pip install failed. Try manually: pip install open-webui"
+                $webUIInstalled = $false
+            }
+        } else {
+            Write-Warn "Start Docker Desktop and re-run this script, or install manually:"
+            Write-Warn "  pip install open-webui && open-webui serve --port 3000"
+            $webUIInstalled = $false
+        }
+    }
 }
 
 # -- Step 8: Quick Test --
