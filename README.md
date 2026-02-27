@@ -18,12 +18,16 @@ chmod +x setup.sh
 
 ### Windows
 
+**Easiest**: Double-click **`setup-windows.bat`** — it handles everything.
+
+**Alternative** (if you prefer the command line):
+
 ```powershell
 # Open PowerShell as Administrator, then run:
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
 
-> **Getting an error?** Windows blocks scripts downloaded from the internet by default. The command above bypasses this for the single script run. Alternatively, right-click the `.ps1` file → Properties → check "Unblock" → OK, then run `.\setup-windows.ps1` normally.
+> **Note**: Don't double-click the `.ps1` file directly — Windows opens it in Notepad instead of running it. Use the `.bat` launcher or the PowerShell command above.
 
 The script installs everything, downloads 3 models + 3 legal presets (~32GB), and starts the chat interface. Takes 15-30 minutes depending on internet speed.
 
