@@ -1,0 +1,6 @@
+# Force Windows line endings for Windows scripts
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Keep Unix line endings for Linux scripts
+*.sh text eol=lf

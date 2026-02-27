@@ -1,5 +1,5 @@
 # ============================================================================
-# Local AI Setup for Legal Work — Windows Edition
+# Local AI Setup for Legal Work --Windows Edition
 #
 # Target: Windows 10/11 with NVIDIA or AMD GPU (12GB+ VRAM)
 #
@@ -15,7 +15,7 @@
 #   2. Run: powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 #
 # If you get "running scripts is disabled on this system":
-#   - Right-click this file → Properties → check "Unblock" → OK
+#   - Right-click this file -> Properties -> check "Unblock" -> OK
 #   - Or run: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 #
 # After setup, all AI inference runs locally. No data leaves your machine.
@@ -25,22 +25,22 @@ $ErrorActionPreference = "Stop"
 
 $scriptDir = $PSScriptRoot
 
-# ── Helpers ──
-function Write-Step { param($num, $msg) Write-Host "`n── Step $num ──" -ForegroundColor White; Write-Host "  $msg" -ForegroundColor Cyan }
+# -- Helpers --
+function Write-Step { param($num, $msg) Write-Host "`n-- Step $num --" -ForegroundColor White; Write-Host "  $msg" -ForegroundColor Cyan }
 function Write-Ok { param($msg) Write-Host "  [OK]    $msg" -ForegroundColor Green }
 function Write-Warn { param($msg) Write-Host "  [WARN]  $msg" -ForegroundColor Yellow }
 function Write-Err { param($msg) Write-Host "  [ERROR] $msg" -ForegroundColor Red }
 function Write-Info { param($msg) Write-Host "  [INFO]  $msg" -ForegroundColor Blue }
 
-# ── Check Admin ──
+# -- Check Admin --
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Warn "Not running as Administrator. Some steps may require elevation."
-    Write-Warn "If installation fails, right-click PowerShell → 'Run as Administrator'"
+    Write-Warn "If installation fails, right-click PowerShell -> 'Run as Administrator'"
     Write-Host ""
 }
 
-# ── Banner ──
+# -- Banner --
 Write-Host ""
 Write-Host "============================================" -ForegroundColor White
 Write-Host "  Local AI Setup for Legal Work" -ForegroundColor White
@@ -58,7 +58,7 @@ Write-Host ""
 $confirm = Read-Host "Continue? [Y/n]"
 if ($confirm -and $confirm -notmatch '^[Yy]') { Write-Host "Aborted."; exit 0 }
 
-# ── Step 1: Check GPU ──
+# -- Step 1: Check GPU --
 Write-Step "1/8" "Checking hardware"
 
 $gpu = Get-CimInstance -ClassName Win32_VideoController | Select-Object -ExpandProperty Name
@@ -87,7 +87,7 @@ try {
     if ($vramGB -gt 0) {
         Write-Info "VRAM: ${vramGB}GB"
         if ($vramGB -lt 12) {
-            Write-Warn "Less than 12GB VRAM. mistral-small:24b may not fit — will pull smaller models only."
+            Write-Warn "Less than 12GB VRAM. mistral-small:24b may not fit --will pull smaller models only."
         }
     }
 } catch {
@@ -95,7 +95,7 @@ try {
     $vramGB = 0
 }
 
-# ── Step 2: Install Ollama ──
+# -- Step 2: Install Ollama --
 Write-Step "2/8" "Installing Ollama"
 
 $ollamaPath = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
@@ -145,7 +145,7 @@ if ($ollamaInPath -or (Test-Path $ollamaPath)) {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 }
 
-# ── Step 3: Configure GPU tuning ──
+# -- Step 3: Configure GPU tuning --
 Write-Step "3/8" "Configuring GPU acceleration"
 
 # Set environment variables for Ollama performance tuning
@@ -179,7 +179,7 @@ if ($gpuType -eq "amd") {
     Write-Info "AMD GPU: Ollama will auto-detect Vulkan on Windows"
 }
 
-# ── Step 4: Start Ollama and wait ──
+# -- Step 4: Start Ollama and wait --
 Write-Step "4/8" "Starting Ollama"
 
 # Check if Ollama is already running
@@ -222,7 +222,7 @@ if (-not $ollamaRunning) {
 
 Write-Ok "Ollama is running"
 
-# ── Step 5: Pull Models ──
+# -- Step 5: Pull Models --
 Write-Step "5/8" "Downloading AI models (this takes a while)"
 
 Write-Host ""
@@ -251,11 +251,11 @@ foreach ($model in $models) {
     if ($LASTEXITCODE -eq 0) {
         Write-Ok "$model ready"
     } else {
-        Write-Warn "Failed to pull $model — you can try later with: ollama pull $model"
+        Write-Warn "Failed to pull $model --you can try later with: ollama pull $model"
     }
 }
 
-# ── Step 6: Create Legal Presets ──
+# -- Step 6: Create Legal Presets --
 Write-Step "6/8" "Creating legal presets (specialized models)"
 
 Write-Info "Building legal-tuned model presets from Modelfiles..."
@@ -274,15 +274,15 @@ foreach ($name in $modelfiles) {
             if ($LASTEXITCODE -eq 0) {
                 Write-Ok "$name ready"
             } else {
-                Write-Warn "Failed to create $name — you can try later with: ollama create $name -f $modelfile"
+                Write-Warn "Failed to create $name --you can try later with: ollama create $name -f $modelfile"
             }
         }
     } else {
-        Write-Warn "Modelfile.$name not found in $scriptDir — skipping"
+        Write-Warn "Modelfile.$name not found in $scriptDir --skipping"
     }
 }
 
-# ── Step 7: Install Docker Desktop + Open WebUI ──
+# -- Step 7: Install Docker Desktop + Open WebUI --
 Write-Step "7/8" "Installing Open WebUI (chat interface)"
 
 $dockerAvailable = Get-Command docker -ErrorAction SilentlyContinue
@@ -333,7 +333,7 @@ if (-not $dockerAvailable) {
         $webUIInstalled = $false
     }
 } else {
-    # Docker is available — use it
+    # Docker is available --use it
     $existing = docker ps -a --format "{{.Names}}" 2>$null | Where-Object { $_ -eq "open-webui" }
     if ($existing) {
         Write-Ok "Open WebUI container already exists"
@@ -341,7 +341,7 @@ if (-not $dockerAvailable) {
     } else {
         Write-Info "Starting Open WebUI container (with RAG document support)..."
         # Pin to a specific release tag for supply chain safety
-        # Bind to 127.0.0.1 only — not accessible from other machines on the network
+        # Bind to 127.0.0.1 only --not accessible from other machines on the network
         docker run -d `
             -p 127.0.0.1:3000:8080 `
             --add-host=host.docker.internal:host-gateway `
@@ -361,7 +361,7 @@ if (-not $dockerAvailable) {
     $webUIInstalled = $true
 }
 
-# ── Step 8: Quick Test ──
+# -- Step 8: Quick Test --
 Write-Step "8/8" "Running quick test"
 
 Write-Info "Testing gemma3:12b with a simple legal prompt..."
@@ -391,7 +391,7 @@ try {
     Write-Warn "Try manually in a terminal: ollama run gemma3:12b"
 }
 
-# ── Verify Security ──
+# -- Verify Security --
 Write-Host ""
 Write-Info "Verifying network security..."
 
@@ -420,7 +420,7 @@ try {
     }
 } catch {}
 
-# ── Done ──
+# -- Done --
 Write-Host ""
 Write-Host "============================================" -ForegroundColor White
 Write-Host "  Setup Complete!" -ForegroundColor Green
