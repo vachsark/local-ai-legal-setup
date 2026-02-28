@@ -29,7 +29,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 
 > **Note**: Don't double-click the `.ps1` file directly — Windows opens it in Notepad instead of running it. Use the `.bat` launcher or the PowerShell command above.
 
-The script installs everything, downloads 3 models + 3 legal presets (~32GB), and starts the chat interface. Takes 15-30 minutes depending on internet speed.
+The script installs everything, downloads 3 models + 5 legal presets (~32GB), and starts the chat interface. Takes 15-30 minutes depending on internet speed.
 
 When done, open **http://localhost:3000** in your browser.
 
@@ -330,7 +330,7 @@ Standard text-based PDFs work immediately. Scanned PDFs (images of paper) need O
 
 ## Legal Presets
 
-The setup script creates 3 specialized models that appear in the Open WebUI dropdown alongside the base models. Each has a tuned system prompt for a specific legal task.
+The setup script creates 5 specialized models that appear in the Open WebUI dropdown alongside the base models. Each has a tuned system prompt for a specific legal task.
 
 ### contract-reviewer (based on qwen3:14b)
 
@@ -350,6 +350,22 @@ Organizes summaries by topic (not chronologically), includes page:line reference
 
 Uses IRAC structure (Issue, Rule, Application, Conclusion) and standard memo format. Slower but produces the most thorough analysis. Best for final work product.
 
+### clause-identifier (based on qwen3:14b)
+
+**Use for**: Structured clause extraction and risk assessment
+
+Produces a JSON-formatted inventory of every clause in a contract, with type classification (28+ clause types), risk ratings (LOW/MEDIUM/HIGH/CRITICAL), and flags for missing standard clauses. Runs with chain-of-thought disabled (`/no_think`) for cleaner structured output.
+
+Best used with uploaded contracts — it will identify and categorize every clause, flag risks, and call out what's missing. See the [Demo: Clause Identification](#demo-clause-identification) section below.
+
+### legal-reviewer (based on qwen3:14b)
+
+**Use for**: Legal writing review and proofreading
+
+Applies a 7-point checklist: grammar, legal vocabulary preservation (never replaces terms of art or Latin phrases), defined term consistency, citation flagging (never auto-corrects Bluebook), tone/formality, readability, and document-type standards. Provides specific shall/may/will/must guidance.
+
+Output is organized into: Critical Issues, Style Improvements, Consistency Notes, Readability Assessment, and Citations to Verify.
+
 ### When to Use Presets vs. Base Models
 
 | Task                              | Use                                               |
@@ -358,7 +374,93 @@ Uses IRAC structure (Issue, Rule, Application, Conclusion) and standard memo for
 | Contract review with uploaded PDF | contract-reviewer                                 |
 | Deposition summary                | depo-summarizer                                   |
 | Formal memo or detailed analysis  | memo-drafter                                      |
+| Clause inventory and risk mapping | clause-identifier                                 |
+| Proofread a brief or contract     | legal-reviewer                                    |
 | Anything else                     | Start with base model, switch to preset if needed |
+
+---
+
+## Tools (Import Manually)
+
+Three custom tools are included in the `tools/` folder. Unlike presets, tools must be imported manually into Open WebUI.
+
+### How to Import
+
+1. Open **http://localhost:3000** and log in
+2. Click **Workspace** (left sidebar) → **Tools** → **+** (top right)
+3. Open the `.py` file from the `tools/` folder in a text editor
+4. Copy the entire contents and paste into the tool editor
+5. Click **Save**
+6. Repeat for each tool
+
+Once imported, tools appear in the **Tools** menu (wrench icon) when composing a message. Toggle them on to make them available in that chat.
+
+### legal-grammar-checker
+
+**Requires**: [LanguageTool](#optional-languagetool-grammar-server) running locally
+
+Sends your text to a local LanguageTool server for grammar and style checking. Returns structured issues (category, context, suggestions) for the LLM to interpret in legal context. Gracefully handles LanguageTool being unavailable — you'll get setup instructions instead of an error.
+
+**Usage**: Enable the tool, then ask: "Check this paragraph for grammar issues: [paste text]"
+
+### legal-readability-scorer
+
+**Requires**: `textstat` Python package (auto-installed by Open WebUI)
+
+Calculates standard readability metrics (Flesch-Kincaid, Gunning Fog, SMOG, Coleman-Liau, ARI, Dale-Chall) plus sentence statistics (count, average length, long sentences, passive voice estimate). Includes legal-context interpretation bands:
+
+| Grade Level | Typical Legal Use                        |
+| ----------- | ---------------------------------------- |
+| 18+         | Law review articles, appellate briefs    |
+| 16-17       | Briefs, motions, judicial opinions       |
+| 14-15       | Contracts, transactional documents       |
+| 12-13       | Business letters, client advisories      |
+| 10-11       | Client letters, plain-language summaries |
+| Below 10    | Consumer disclosures, public notices     |
+
+**Usage**: Enable the tool, then ask: "Score the readability of this section: [paste text]"
+
+### contract-comparator
+
+**Requires**: Nothing extra (uses Python stdlib)
+
+Compares two uploaded files side-by-side. Produces a similarity percentage, line-level additions/deletions count, and a unified diff (capped at 500 lines to protect the context window). The LLM interprets the legal significance of each change.
+
+**Usage**: Enable the tool, attach two document files to your message, then ask: "Compare these two versions and explain what changed"
+
+---
+
+## Voice-to-Text
+
+Open WebUI includes built-in voice dictation powered by OpenAI's Whisper model. This runs locally — no audio leaves your machine.
+
+### How to Use
+
+1. Click the **microphone icon** in the chat input bar
+2. Speak naturally — Whisper transcribes your speech to text
+3. The transcription appears in the input box for you to review and edit before sending
+
+The Whisper `base` model (~74MB) downloads automatically the first time you click the mic. Subsequent uses are instant.
+
+### Whisper Model Sizes
+
+The setup script configures the `base` model (good balance of speed and accuracy). You can change this in Open WebUI's **Admin Panel → Settings → Audio**:
+
+| Model  | Size  | Notes                                   |
+| ------ | ----- | --------------------------------------- |
+| tiny   | 39MB  | Fastest, lower accuracy                 |
+| base   | 74MB  | Default — good accuracy, fast           |
+| small  | 244MB | Better accuracy, still reasonable speed |
+| medium | 769MB | High accuracy, slower                   |
+
+### Legal Use Cases
+
+- **Dictate case notes** after depositions or client meetings while details are fresh
+- **Draft memos** by speaking your analysis, then editing the transcription
+- **Record observations** during document review without switching to a keyboard
+- **Quick questions** — faster than typing "What is the statute of limitations for breach of contract in California?"
+
+> **Tip**: Whisper handles legal vocabulary reasonably well, but review the transcription before sending — terms like "estoppel," "res judicata," and party names may need correction.
 
 ---
 
@@ -453,6 +555,47 @@ Switch models in the dropdown to try different tasks on the same document:
 
 ---
 
+## Demo: Clause Identification
+
+Here's a quick walkthrough of the clause-identifier preset. You can use it with or without document upload.
+
+### Without RAG (Paste Directly)
+
+1. Select **clause-identifier** from the model dropdown
+2. Paste a contract or clause directly into the chat:
+
+```
+Identify all clauses in this agreement and assess their risks:
+
+[paste your contract text here]
+```
+
+### With RAG (Uploaded Document)
+
+1. Upload a contract to a Knowledge collection (see the contract review demo above)
+2. Select **clause-identifier** from the model dropdown
+3. Type `#` and select your collection
+4. Ask:
+
+```
+Produce a complete clause inventory for this agreement. Include risk ratings
+and flag any standard clauses that are missing.
+```
+
+### What You Should See
+
+The model returns structured JSON output with:
+
+- **clauses**: Each clause typed (INDEMNIFICATION, FORCE_MAJEURE, etc.), located, summarized, and risk-rated
+- **missing_clauses**: Standard provisions absent from the document, ranked by importance
+- **document_summary**: Overall risk profile and total clause count
+
+After the JSON, you'll get a narrative summary highlighting the most significant risks and any clause interactions or conflicts.
+
+> **Tip**: The clause-identifier uses `/no_think` mode for cleaner extraction. If you want the model to reason through ambiguous clauses, try the contract-reviewer preset instead — it explains its reasoning.
+
+---
+
 ## Optional: Community Tools
 
 Open WebUI supports community-built tools that extend model capabilities (web search, calculators, document formatters, etc.).
@@ -487,6 +630,42 @@ docker run -d \
 Then in Open WebUI: **Admin Panel → Settings → Documents → Content Extraction Engine** → set to **Docling** and enter `http://host.docker.internal:5001`.
 
 **Note**: Docling requires ~4GB RAM and takes 30-60 seconds per page for OCR. Only set this up if you regularly work with scanned documents.
+
+---
+
+## Optional: LanguageTool (Grammar Server)
+
+The **legal-grammar-checker** tool (see [Tools](#tools-import-manually)) requires a local LanguageTool server. The setup script offers to install this, but you can also set it up manually.
+
+### Linux
+
+```bash
+docker run -d \
+    -p 127.0.0.1:8081:8010 \
+    --name languagetool \
+    --restart unless-stopped \
+    silviof/docker-languagetool
+```
+
+### Windows
+
+```powershell
+docker run -d `
+    -p 127.0.0.1:8081:8010 `
+    --name languagetool `
+    --restart unless-stopped `
+    silviof/docker-languagetool
+```
+
+### Verify It's Working
+
+```bash
+curl http://localhost:8081/v2/check -d "language=en-US&text=This are a test."
+```
+
+You should get a JSON response with a grammar issue about "This are."
+
+**Note**: The container is ~500MB and binds to localhost only. It restarts automatically unless you manually stop it.
 
 ---
 
@@ -652,20 +831,20 @@ Some prompts are too long for the context window. Try:
 
 - **All inference is local.** After initial setup, Ollama runs models directly on your GPU. No API calls, no cloud services.
 - **Initial setup requires internet** to download Ollama, Docker images, and AI models (~31GB). After that, no internet is needed.
-- **Both services bind to localhost only** (`127.0.0.1`). They are not accessible from other machines on your network.
+- **All services bind to localhost only** (`127.0.0.1`). They are not accessible from other machines on your network.
 - **Open WebUI stores chat history locally** in a Docker volume on your machine.
 - **The setup script adds your user to the `docker` group** (with your confirmation). This grants root-equivalent access on the local machine. If this is a concern, use `sudo docker` commands instead.
 
 ### Verify Network Security
 
 ```bash
-# Linux: Verify both services are localhost-only
-sudo ss -tlnp | grep -E "11434|3000"
-# Should show 127.0.0.1 for both ports
+# Linux: Verify all services are localhost-only
+sudo ss -tlnp | grep -E "11434|3000|8081"
+# Should show 127.0.0.1 for all ports
 
 # Windows:
-netstat -an | findstr "11434 3000"
-# Should show 127.0.0.1 for both ports
+netstat -an | findstr "11434 3000 8081"
+# Should show 127.0.0.1 for all ports
 ```
 
 ### Air-Gap After Setup
@@ -682,6 +861,9 @@ To completely remove everything:
 # Remove Open WebUI
 docker stop open-webui && docker rm open-webui
 docker volume rm open-webui
+
+# Remove LanguageTool (if installed)
+docker stop languagetool && docker rm languagetool
 
 # Remove Ollama and models
 sudo systemctl stop ollama
