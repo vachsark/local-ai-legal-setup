@@ -219,6 +219,52 @@ The models can process roughly 12,000-16,000 words at a time. This means:
 
 ---
 
+## ABA Ethics Guidance on AI in Legal Practice
+
+The American Bar Association has issued formal guidance on using generative AI tools (ChatGPT, Claude, local models like these, etc.) in legal work. If you're using this setup in a professional context, these rules apply to you.
+
+### ABA Formal Opinion 512 (July 2024)
+
+The ABA's first formal ethics opinion on generative AI maps existing Model Rules of Professional Conduct to AI use across six areas:
+
+**1. Competence (Rule 1.1)** — You must develop a "reasonable understanding" of AI capabilities and limitations before using it. This is a professional obligation, not optional. Take CLEs or consult experts.
+
+**2. Confidentiality (Rule 1.6)** — Never enter client information into public AI tools (free ChatGPT, etc.) that retain and learn from data. Assess disclosure risks and get informed client consent before using AI on their matters. Generic engagement letter language is not sufficient.
+
+> This local setup addresses confidentiality by design — all inference runs on your machine, no data leaves it, and all services bind to localhost only.
+
+**3. Communication (Rule 1.4)** — You may need to disclose AI use to clients, especially regarding fees or when AI materially influences representation decisions. Best practice: explain AI usage in engagement letters.
+
+**4. Candor to Tribunals (Rule 3.3)** — Independently verify everything before court submission. AI hallucination of case citations is a known, serious risk. You are responsible for accuracy.
+
+**5. Supervisory Duties (Rules 5.1/5.3)** — Firms must establish clear AI policies, train lawyers on risks, and oversee subordinates' and vendors' AI use.
+
+**6. Fees (Rule 1.5)** — Cannot bill clients for time spent learning AI tools. Must explain AI-related charges upfront. If AI makes you faster, hourly billing should reflect actual time. Flat fees should account for efficiency gains.
+
+### ABA AI Task Force Report (December 2025)
+
+The ABA Task Force on Law and Artificial Intelligence released its final report declaring AI has "moved from experiment to infrastructure" for the legal profession. The framing shifted from "should lawyers use AI?" to "how should lawyers use AI responsibly?"
+
+### How This Setup Aligns
+
+| ABA Requirement | This Setup                                                             |
+| --------------- | ---------------------------------------------------------------------- |
+| Confidentiality | All local, no cloud APIs, localhost-only binding                       |
+| Competence      | README documents limitations, hallucination risks, accuracy warnings   |
+| Verification    | Critical warnings throughout: never trust citations, verify everything |
+| Candor          | Models explicitly instructed not to fabricate citations                |
+
+**What you'd still need for a firm setting**: written AI use policies, client disclosure templates, training documentation, and supervisory oversight procedures.
+
+### Further Reading
+
+- [ABA Formal Opinion 512 Summary](https://library.law.unc.edu/2025/02/aba-formal-opinion-512-the-paradigm-for-generative-ai-in-legal-practice/)
+- [Breaking Down ABA's AI Guidance](https://www.2civility.org/breaking-down-the-abas-guidance-on-using-generative-ai-in-legal-practice/)
+- [ABA Ethics Opinion Framework](https://www.americanbar.org/groups/business_law/resources/business-law-today/2024-october/aba-ethics-opinion-generative-ai-offers-useful-framework/)
+- [ABA AI Task Force Report](https://www.americanbar.org/news/abanews/aba-news-archives/2025/12/aba-ai-task-force-report-examines-opportunities-challenges/)
+
+---
+
 ## Tips for Best Results
 
 ### Be Specific
