@@ -9,6 +9,8 @@
 #   3. Recommended models for legal work
 #   4. Legal preset models with specialized system prompts
 #   5. RAG (document upload) with legal-optimized settings
+#   6. Voice-to-text (Whisper) for dictation
+#   7. Optional: LanguageTool for grammar checking
 #
 # Usage:
 #   1. Open PowerShell as Administrator
@@ -50,7 +52,7 @@ Write-Host ""
 Write-Host "This will install:"
 Write-Host "  - Ollama (AI model server with GPU acceleration)"
 Write-Host "  - Docker Desktop + Open WebUI (browser-based chat interface)"
-Write-Host "  - 3 language models, 3 legal presets, and an embedding model (~32GB download)"
+Write-Host "  - 3 language models, 5 legal presets, and an embedding model (~32GB download)"
 Write-Host ""
 Write-Host "Estimated time: 20-40 minutes (depending on internet speed)"
 Write-Host "Disk space needed: ~40GB"
@@ -59,7 +61,7 @@ $confirm = Read-Host "Continue? [Y/n]"
 if ($confirm -and $confirm -notmatch '^[Yy]') { Write-Host "Aborted."; exit 0 }
 
 # -- Step 1: Check GPU --
-Write-Step "1/8" "Checking hardware"
+Write-Step "1/9" "Checking hardware"
 
 $gpu = Get-CimInstance -ClassName Win32_VideoController | Select-Object -ExpandProperty Name
 $hasNvidia = $gpu | Where-Object { $_ -match "NVIDIA" }
@@ -113,7 +115,7 @@ try {
 }
 
 # -- Step 2: Install Ollama --
-Write-Step "2/8" "Installing Ollama"
+Write-Step "2/9" "Installing Ollama"
 
 $ollamaPath = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
 $ollamaInPath = Get-Command ollama -ErrorAction SilentlyContinue
@@ -188,7 +190,7 @@ if ($ollamaInPath -or (Test-Path $ollamaPath)) {
 }
 
 # -- Step 3: Configure GPU tuning --
-Write-Step "3/8" "Configuring GPU acceleration"
+Write-Step "3/9" "Configuring GPU acceleration"
 
 # Set environment variables for Ollama performance tuning
 $envVars = @{
@@ -222,7 +224,7 @@ if ($gpuType -eq "amd") {
 }
 
 # -- Step 4: Start Ollama and wait --
-Write-Step "4/8" "Starting Ollama"
+Write-Step "4/9" "Starting Ollama"
 
 # Check if Ollama is already running
 $ollamaRunning = $false
@@ -265,7 +267,7 @@ if (-not $ollamaRunning) {
 Write-Ok "Ollama is running"
 
 # -- Step 5: Pull Models --
-Write-Step "5/8" "Downloading AI models (this takes a while)"
+Write-Step "5/9" "Downloading AI models (this takes a while)"
 
 Write-Host ""
 Write-Host "  Pulling 3 models for legal work + embedding model for document search:"
@@ -298,11 +300,11 @@ foreach ($model in $models) {
 }
 
 # -- Step 6: Create Legal Presets --
-Write-Step "6/8" "Creating legal presets (specialized models)"
+Write-Step "6/9" "Creating legal presets (specialized models)"
 
 Write-Info "Building legal-tuned model presets from Modelfiles..."
 
-$modelfiles = @("contract-reviewer", "depo-summarizer", "memo-drafter")
+$modelfiles = @("contract-reviewer", "depo-summarizer", "memo-drafter", "clause-identifier", "legal-reviewer")
 
 foreach ($name in $modelfiles) {
     $modelfile = Join-Path $scriptDir "Modelfile.$name"
@@ -325,7 +327,7 @@ foreach ($name in $modelfiles) {
 }
 
 # -- Step 7: Install Docker Desktop + Open WebUI --
-Write-Step "7/8" "Installing Open WebUI (chat interface)"
+Write-Step "7/9" "Installing Open WebUI (chat interface)"
 
 $dockerAvailable = Get-Command docker -ErrorAction SilentlyContinue
 
@@ -416,6 +418,8 @@ if (-not $dockerAvailable) {
                 -e CHUNK_OVERLAP=75 `
                 -e ENABLE_RAG_HYBRID_SEARCH=true `
                 -e RAG_SYSTEM_CONTEXT=true `
+                -e AUDIO_STT_ENGINE=whisper `
+                -e WHISPER_MODEL=base `
                 --name open-webui `
                 --restart always `
                 ghcr.io/open-webui/open-webui:v0.6.5
@@ -449,8 +453,38 @@ if (-not $dockerAvailable) {
     }
 }
 
-# -- Step 8: Quick Test --
-Write-Step "8/8" "Running quick test"
+# -- Step 8: Optional LanguageTool --
+Write-Step "8/9" "Optional -- LanguageTool (grammar checker backend)"
+
+Write-Host ""
+Write-Host "  LanguageTool is a grammar/style checker that powers the legal-grammar-checker tool."
+Write-Host "  It runs as a Docker container (~500MB download). This is optional."
+Write-Host ""
+$ltConfirm = Read-Host "Install LanguageTool? [y/N]"
+if ($ltConfirm -match '^[Yy]' -and $dockerRunning) {
+    $ltExisting = docker ps -a --format "{{.Names}}" 2>$null | Where-Object { $_ -eq "languagetool" }
+    if ($ltExisting) {
+        Write-Ok "LanguageTool container already exists"
+        docker start languagetool 2>$null
+    } else {
+        Write-Info "Starting LanguageTool container..."
+        docker run -d `
+            -p 127.0.0.1:8081:8010 `
+            --name languagetool `
+            --restart unless-stopped `
+            silviof/docker-languagetool
+        if ($LASTEXITCODE -eq 0) {
+            Write-Ok "LanguageTool is running (localhost:8081)"
+        } else {
+            Write-Warn "Failed to start LanguageTool. You can install it later -- see README.md."
+        }
+    }
+} else {
+    Write-Info "Skipping LanguageTool. You can install it later -- see README.md."
+}
+
+# -- Step 9: Quick Test --
+Write-Step "9/9" "Running quick test"
 
 Write-Info "Testing gemma3:12b with a simple legal prompt..."
 Write-Host ""
@@ -508,6 +542,16 @@ try {
     }
 } catch {}
 
+# Check LanguageTool bind address
+try {
+    $ltListeners = netstat -an 2>$null | Select-String ":8081" | Select-String "LISTENING"
+    if ($ltListeners -and $ltListeners -match "127\.0\.0\.1") {
+        Write-Ok "LanguageTool bound to localhost only (127.0.0.1:8081)"
+    } elseif ($ltListeners) {
+        Write-Warn "Could not verify LanguageTool bind address. Check: netstat -an | findstr 8081"
+    }
+} catch {}
+
 # -- Done --
 Write-Host ""
 Write-Host "============================================" -ForegroundColor White
@@ -542,11 +586,22 @@ Write-Host "  Legal presets (specialized system prompts):" -ForegroundColor Whit
 Write-Host "    - contract-reviewer  Contract analysis (qwen3:14b)"
 Write-Host "    - depo-summarizer    Deposition summaries (gemma3:12b)"
 Write-Host "    - memo-drafter       Legal memo drafting (mistral-small)"
+Write-Host "    - clause-identifier  Structured clause extraction (qwen3:14b)"
+Write-Host "    - legal-reviewer     Writing review and proofreading (qwen3:14b)"
+Write-Host ""
+Write-Host "  Tools (import manually in Open WebUI > Workspace > Tools > +):" -ForegroundColor White
+Write-Host "    - legal-grammar-checker    Grammar/style checking (needs LanguageTool)"
+Write-Host "    - legal-readability-scorer Readability metrics for legal text"
+Write-Host "    - contract-comparator      Side-by-side document comparison"
+Write-Host "    See tools\ folder and README.md for import instructions."
+Write-Host ""
+Write-Host "  Voice-to-text: Click the mic icon in the chat input to dictate." -ForegroundColor Gray
+Write-Host "    Whisper (base model) downloads automatically on first use (~74MB)." -ForegroundColor Gray
 Write-Host ""
 Write-Host "  Document upload: Create a Knowledge collection in Open WebUI," -ForegroundColor Gray
 Write-Host "  upload PDFs, then reference them with # in chat. See README.md." -ForegroundColor Gray
 Write-Host ""
-Write-Host "  See README.md for example prompts, limitations, and RAG tips." -ForegroundColor Gray
+Write-Host "  See README.md for example prompts, tools setup, limitations, and RAG tips." -ForegroundColor Gray
 Write-Host ""
 Write-Host "  IMPORTANT: These models are not as accurate as GPT-4 or Claude." -ForegroundColor Yellow
 Write-Host "  Always verify outputs, especially case citations and legal claims." -ForegroundColor Yellow

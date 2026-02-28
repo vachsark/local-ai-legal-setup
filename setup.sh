@@ -10,6 +10,8 @@
 #   4. Legal preset models with specialized system prompts
 #   5. RAG (document upload) with legal-optimized settings
 #   6. GPU tuning for optimal performance
+#   7. Voice-to-text (Whisper) for dictation
+#   8. Optional: LanguageTool for grammar checking
 #
 # Usage:
 #   chmod +x setup.sh
@@ -46,7 +48,7 @@ echo -e "${NC}"
 echo "This will install:"
 echo "  - Ollama (AI model server with GPU acceleration)"
 echo "  - Open WebUI (browser-based chat interface)"
-echo "  - 3 language models, 3 legal presets, and an embedding model (~32GB download)"
+echo "  - 3 language models, 5 legal presets, and an embedding model (~32GB download)"
 echo ""
 echo "Estimated time: 15-30 minutes (depending on internet speed)"
 echo "Disk space needed: ~35GB"
@@ -55,7 +57,7 @@ read -p "Continue? [Y/n] " confirm
 [[ "${confirm:-Y}" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
 # ── Check for AMD GPU ──
-step "1/8: Checking hardware"
+step "1/9: Checking hardware"
 
 if lspci 2>/dev/null | grep -qi "VGA.*AMD\|Display.*AMD"; then
     gpu_name=$(lspci | grep -iE "VGA|Display" | grep -i AMD | head -1 | sed 's/.*: //')
@@ -78,7 +80,7 @@ else
 fi
 
 # ── Install Ollama ──
-step "2/8: Installing Ollama"
+step "2/9: Installing Ollama"
 
 if command -v ollama &>/dev/null; then
     ok "Ollama already installed: $(ollama --version 2>/dev/null || echo 'version unknown')"
@@ -112,7 +114,7 @@ else
 fi
 
 # ── Configure Vulkan Backend & Tuning ──
-step "3/8: Configuring GPU acceleration"
+step "3/9: Configuring GPU acceleration"
 
 info "Setting up Vulkan (RADV) backend and performance tuning..."
 
@@ -165,7 +167,7 @@ for i in $(seq 1 30); do
 done
 
 # ── Pull Models ──
-step "4/8: Downloading AI models (this takes a while)"
+step "4/9: Downloading AI models (this takes a while)"
 
 echo ""
 echo "Pulling 3 models for legal work + embedding model for document search:"
@@ -188,11 +190,11 @@ for model in "${models[@]}"; do
 done
 
 # ── Create Legal Presets ──
-step "5/8: Creating legal presets (specialized models)"
+step "5/9: Creating legal presets (specialized models)"
 
 info "Building legal-tuned model presets from Modelfiles..."
 
-modelfiles=("contract-reviewer" "depo-summarizer" "memo-drafter")
+modelfiles=("contract-reviewer" "depo-summarizer" "memo-drafter" "clause-identifier" "legal-reviewer")
 
 for name in "${modelfiles[@]}"; do
     modelfile="$SCRIPT_DIR/Modelfile.$name"
@@ -210,7 +212,7 @@ for name in "${modelfiles[@]}"; do
 done
 
 # ── Install Docker (if needed for Open WebUI) ──
-step "6/8: Setting up Docker"
+step "6/9: Setting up Docker"
 
 if command -v docker &>/dev/null; then
     ok "Docker already installed"
@@ -251,7 +253,7 @@ if ! docker info &>/dev/null 2>&1; then
 fi
 
 # ── Install Open WebUI ──
-step "7/8: Installing Open WebUI (chat interface)"
+step "7/9: Installing Open WebUI (chat interface)"
 
 # Pin to a specific release tag for supply chain safety
 OPEN_WEBUI_IMAGE="ghcr.io/open-webui/open-webui:v0.6.5"
@@ -274,6 +276,8 @@ if [[ ${#DOCKER_CMD[@]} -gt 0 ]]; then
             -e CHUNK_OVERLAP=75 \
             -e ENABLE_RAG_HYBRID_SEARCH=true \
             -e RAG_SYSTEM_CONTEXT=true \
+            -e AUDIO_STT_ENGINE=whisper \
+            -e WHISPER_MODEL=base \
             --name open-webui \
             --restart always \
             "$OPEN_WEBUI_IMAGE"
@@ -284,8 +288,33 @@ else
     echo "  pip install open-webui && open-webui serve --port 3000"
 fi
 
+# ── Optional: LanguageTool ──
+step "8/9: Optional — LanguageTool (grammar checker backend)"
+
+echo ""
+echo "LanguageTool is a grammar/style checker that powers the legal-grammar-checker tool."
+echo "It runs as a Docker container (~500MB download). This is optional."
+echo ""
+read -p "Install LanguageTool? [y/N] " lt_confirm
+if [[ "${lt_confirm:-N}" =~ ^[Yy]$ ]] && [[ ${#DOCKER_CMD[@]} -gt 0 ]]; then
+    if "${DOCKER_CMD[@]}" ps -a --format '{{.Names}}' 2>/dev/null | grep -q "languagetool"; then
+        ok "LanguageTool container already exists"
+        "${DOCKER_CMD[@]}" start languagetool 2>/dev/null || true
+    else
+        info "Starting LanguageTool container..."
+        "${DOCKER_CMD[@]}" run -d \
+            -p 127.0.0.1:8081:8010 \
+            --name languagetool \
+            --restart unless-stopped \
+            silviof/docker-languagetool
+        ok "LanguageTool is running (localhost:8081)"
+    fi
+else
+    info "Skipping LanguageTool. You can install it later — see README.md."
+fi
+
 # ── Quick Test ──
-step "8/8: Running quick test"
+step "9/9: Running quick test"
 
 info "Testing gemma3:12b with a simple legal prompt..."
 echo ""
@@ -324,6 +353,13 @@ if ss -tlnp 2>/dev/null | grep ":3000" | grep -q "127.0.0.1"; then
 else
     warn "Could not verify Open WebUI bind address. Check: ss -tlnp | grep 3000"
 fi
+if ss -tlnp 2>/dev/null | grep ":8081" &>/dev/null; then
+    if ss -tlnp 2>/dev/null | grep ":8081" | grep -q "127.0.0.1"; then
+        ok "LanguageTool bound to localhost only (127.0.0.1:8081)"
+    else
+        warn "Could not verify LanguageTool bind address. Check: ss -tlnp | grep 8081"
+    fi
+fi
 
 # ── Done ──
 echo ""
@@ -347,6 +383,17 @@ echo "Legal presets (specialized system prompts):"
 echo "  - contract-reviewer  Contract analysis (qwen3:14b)"
 echo "  - depo-summarizer    Deposition summaries (gemma3:12b)"
 echo "  - memo-drafter       Legal memo drafting (mistral-small)"
+echo "  - clause-identifier  Structured clause extraction (qwen3:14b)"
+echo "  - legal-reviewer     Writing review and proofreading (qwen3:14b)"
+echo ""
+echo "Tools (import manually in Open WebUI > Workspace > Tools > +):"
+echo "  - legal-grammar-checker    Grammar/style checking (needs LanguageTool)"
+echo "  - legal-readability-scorer Readability metrics for legal text"
+echo "  - contract-comparator      Side-by-side document comparison"
+echo "  See tools/ folder and README.md for import instructions."
+echo ""
+echo "Voice-to-text: Click the mic icon in the chat input to dictate."
+echo "  Whisper (base model) downloads automatically on first use (~74MB)."
 echo ""
 echo "Document upload: Create a Knowledge collection in Open WebUI,"
 echo "upload PDFs, then reference them with # in chat. See README.md."
@@ -354,6 +401,7 @@ echo ""
 echo "See README.md for:"
 echo "  - How to use document upload (RAG)"
 echo "  - Legal preset details and when to use each"
+echo "  - Tools setup and usage instructions"
 echo "  - Example prompts for legal work"
 echo "  - Important limitations to understand"
 echo "  - Troubleshooting tips"
