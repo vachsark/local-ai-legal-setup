@@ -11,6 +11,7 @@
 #   5. RAG (document upload) with legal-optimized settings
 #   6. Voice-to-text (Whisper) for dictation
 #   7. Optional: LanguageTool for grammar checking
+#   8. Optional: Claude API info for quality tier
 #
 # Usage:
 #   1. Open PowerShell as Administrator
@@ -61,7 +62,7 @@ $confirm = Read-Host "Continue? [Y/n]"
 if ($confirm -and $confirm -notmatch '^[Yy]') { Write-Host "Aborted."; exit 0 }
 
 # -- Step 1: Check GPU --
-Write-Step "1/9" "Checking hardware"
+Write-Step "1/10" "Checking hardware"
 
 $gpu = Get-CimInstance -ClassName Win32_VideoController | Select-Object -ExpandProperty Name
 $hasNvidia = $gpu | Where-Object { $_ -match "NVIDIA" }
@@ -115,7 +116,7 @@ try {
 }
 
 # -- Step 2: Install Ollama --
-Write-Step "2/9" "Installing Ollama"
+Write-Step "2/10" "Installing Ollama"
 
 $ollamaPath = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
 $ollamaInPath = Get-Command ollama -ErrorAction SilentlyContinue
@@ -190,7 +191,7 @@ if ($ollamaInPath -or (Test-Path $ollamaPath)) {
 }
 
 # -- Step 3: Configure GPU tuning --
-Write-Step "3/9" "Configuring GPU acceleration"
+Write-Step "3/10" "Configuring GPU acceleration"
 
 # Set environment variables for Ollama performance tuning
 $envVars = @{
@@ -224,7 +225,7 @@ if ($gpuType -eq "amd") {
 }
 
 # -- Step 4: Start Ollama and wait --
-Write-Step "4/9" "Starting Ollama"
+Write-Step "4/10" "Starting Ollama"
 
 # Check if Ollama is already running
 $ollamaRunning = $false
@@ -267,7 +268,7 @@ if (-not $ollamaRunning) {
 Write-Ok "Ollama is running"
 
 # -- Step 5: Pull Models --
-Write-Step "5/9" "Downloading AI models (this takes a while)"
+Write-Step "5/10" "Downloading AI models (this takes a while)"
 
 Write-Host ""
 Write-Host "  Pulling 3 models for legal work + embedding model for document search:"
@@ -300,7 +301,7 @@ foreach ($model in $models) {
 }
 
 # -- Step 6: Create Legal Presets --
-Write-Step "6/9" "Creating legal presets (specialized models)"
+Write-Step "6/10" "Creating legal presets (specialized models)"
 
 Write-Info "Building legal-tuned model presets from Modelfiles..."
 
@@ -327,7 +328,7 @@ foreach ($name in $modelfiles) {
 }
 
 # -- Step 7: Install Docker Desktop + Open WebUI --
-Write-Step "7/9" "Installing Open WebUI (chat interface)"
+Write-Step "7/10" "Installing Open WebUI (chat interface)"
 
 $dockerAvailable = Get-Command docker -ErrorAction SilentlyContinue
 
@@ -454,7 +455,7 @@ if (-not $dockerAvailable) {
 }
 
 # -- Step 8: Optional LanguageTool --
-Write-Step "8/9" "Optional -- LanguageTool (grammar checker backend)"
+Write-Step "8/10" "Optional -- LanguageTool (grammar checker backend)"
 
 Write-Host ""
 Write-Host "  LanguageTool is a grammar/style checker that powers the legal-grammar-checker tool."
@@ -483,8 +484,23 @@ if ($ltConfirm -match '^[Yy]' -and $dockerRunning) {
     Write-Info "Skipping LanguageTool. You can install it later -- see README.md."
 }
 
-# -- Step 9: Quick Test --
-Write-Step "9/9" "Running quick test"
+# -- Step 9: Claude API Info --
+Write-Step "9/10" "Optional -- Claude API (quality tier)"
+
+Write-Host ""
+Write-Host "  For higher-quality analysis on critical work, you can connect Claude API"
+Write-Host "  as an additional model provider in Open WebUI."
+Write-Host ""
+Write-Host "    Setup: Admin Panel -> Connections -> OpenAI -> Add Connection" -ForegroundColor Cyan
+Write-Host "    URL:   https://api.anthropic.com/v1" -ForegroundColor Cyan
+Write-Host "    Key:   From console.anthropic.com" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  See README.md for full instructions, model tiers, and ABA considerations." -ForegroundColor Gray
+Write-Host ""
+Write-Info "This is optional -- all local models work without it."
+
+# -- Step 10: Quick Test --
+Write-Step "10/10" "Running quick test"
 
 Write-Info "Testing gemma3:12b with a simple legal prompt..."
 Write-Host ""
@@ -593,6 +609,8 @@ Write-Host "  Tools (import manually in Open WebUI > Workspace > Tools > +):" -F
 Write-Host "    - legal-grammar-checker    Grammar/style checking (needs LanguageTool)"
 Write-Host "    - legal-readability-scorer Readability metrics for legal text"
 Write-Host "    - contract-comparator      Side-by-side document comparison"
+Write-Host "    - citation-checker         Scan AI output for citations to verify"
+Write-Host "    - ai-disclaimer            Add ABA-compliant disclaimers to output"
 Write-Host "    See tools\ folder and README.md for import instructions."
 Write-Host ""
 Write-Host "  Voice-to-text: Click the mic icon in the chat input to dictate." -ForegroundColor Gray
@@ -601,7 +619,12 @@ Write-Host ""
 Write-Host "  Document upload: Create a Knowledge collection in Open WebUI," -ForegroundColor Gray
 Write-Host "  upload PDFs, then reference them with # in chat. See README.md." -ForegroundColor Gray
 Write-Host ""
-Write-Host "  See README.md for example prompts, tools setup, limitations, and RAG tips." -ForegroundColor Gray
+Write-Host ""
+Write-Host "  ABA compliance templates (in templates\ folder):" -ForegroundColor White
+Write-Host "    - client-disclosure.md   Client AI disclosure letter (Rule 1.4)"
+Write-Host "    - firm-ai-policy.md      Firm AI usage policy (Rules 5.1/5.3)"
+Write-Host ""
+Write-Host "  See README.md for prompts, tools, Claude API setup, limitations, and RAG tips." -ForegroundColor Gray
 Write-Host ""
 Write-Host "  IMPORTANT: These models are not as accurate as GPT-4 or Claude." -ForegroundColor Yellow
 Write-Host "  Always verify outputs, especially case citations and legal claims." -ForegroundColor Yellow

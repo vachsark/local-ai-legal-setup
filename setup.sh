@@ -12,6 +12,7 @@
 #   6. GPU tuning for optimal performance
 #   7. Voice-to-text (Whisper) for dictation
 #   8. Optional: LanguageTool for grammar checking
+#   9. Optional: Claude API info for quality tier
 #
 # Usage:
 #   chmod +x setup.sh
@@ -57,7 +58,7 @@ read -p "Continue? [Y/n] " confirm
 [[ "${confirm:-Y}" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
 # ── Check for AMD GPU ──
-step "1/9: Checking hardware"
+step "1/10: Checking hardware"
 
 if lspci 2>/dev/null | grep -qi "VGA.*AMD\|Display.*AMD"; then
     gpu_name=$(lspci | grep -iE "VGA|Display" | grep -i AMD | head -1 | sed 's/.*: //')
@@ -80,7 +81,7 @@ else
 fi
 
 # ── Install Ollama ──
-step "2/9: Installing Ollama"
+step "2/10: Installing Ollama"
 
 if command -v ollama &>/dev/null; then
     ok "Ollama already installed: $(ollama --version 2>/dev/null || echo 'version unknown')"
@@ -114,7 +115,7 @@ else
 fi
 
 # ── Configure Vulkan Backend & Tuning ──
-step "3/9: Configuring GPU acceleration"
+step "3/10: Configuring GPU acceleration"
 
 info "Setting up Vulkan (RADV) backend and performance tuning..."
 
@@ -167,7 +168,7 @@ for i in $(seq 1 30); do
 done
 
 # ── Pull Models ──
-step "4/9: Downloading AI models (this takes a while)"
+step "4/10: Downloading AI models (this takes a while)"
 
 echo ""
 echo "Pulling 3 models for legal work + embedding model for document search:"
@@ -190,7 +191,7 @@ for model in "${models[@]}"; do
 done
 
 # ── Create Legal Presets ──
-step "5/9: Creating legal presets (specialized models)"
+step "5/10: Creating legal presets (specialized models)"
 
 info "Building legal-tuned model presets from Modelfiles..."
 
@@ -212,7 +213,7 @@ for name in "${modelfiles[@]}"; do
 done
 
 # ── Install Docker (if needed for Open WebUI) ──
-step "6/9: Setting up Docker"
+step "6/10: Setting up Docker"
 
 if command -v docker &>/dev/null; then
     ok "Docker already installed"
@@ -253,7 +254,7 @@ if ! docker info &>/dev/null 2>&1; then
 fi
 
 # ── Install Open WebUI ──
-step "7/9: Installing Open WebUI (chat interface)"
+step "7/10: Installing Open WebUI (chat interface)"
 
 # Pin to a specific release tag for supply chain safety
 OPEN_WEBUI_IMAGE="ghcr.io/open-webui/open-webui:v0.6.5"
@@ -289,7 +290,7 @@ else
 fi
 
 # ── Optional: LanguageTool ──
-step "8/9: Optional — LanguageTool (grammar checker backend)"
+step "8/10: Optional — LanguageTool (grammar checker backend)"
 
 echo ""
 echo "LanguageTool is a grammar/style checker that powers the legal-grammar-checker tool."
@@ -313,8 +314,23 @@ else
     info "Skipping LanguageTool. You can install it later — see README.md."
 fi
 
+# ── Claude API Info ──
+step "9/10: Optional — Claude API (quality tier)"
+
+echo ""
+echo "For higher-quality analysis on critical work, you can connect Claude API"
+echo "as an additional model provider in Open WebUI."
+echo ""
+echo "  Setup: Admin Panel → Connections → OpenAI → Add Connection"
+echo "  URL:   https://api.anthropic.com/v1"
+echo "  Key:   From console.anthropic.com"
+echo ""
+echo "  See README.md for full instructions, model tiers, and ABA considerations."
+echo ""
+info "This is optional — all local models work without it."
+
 # ── Quick Test ──
-step "9/9: Running quick test"
+step "10/10: Running quick test"
 
 info "Testing gemma3:12b with a simple legal prompt..."
 echo ""
@@ -390,6 +406,8 @@ echo "Tools (import manually in Open WebUI > Workspace > Tools > +):"
 echo "  - legal-grammar-checker    Grammar/style checking (needs LanguageTool)"
 echo "  - legal-readability-scorer Readability metrics for legal text"
 echo "  - contract-comparator      Side-by-side document comparison"
+echo "  - citation-checker         Scan AI output for citations to verify"
+echo "  - ai-disclaimer            Add ABA-compliant disclaimers to output"
 echo "  See tools/ folder and README.md for import instructions."
 echo ""
 echo "Voice-to-text: Click the mic icon in the chat input to dictate."
@@ -398,11 +416,16 @@ echo ""
 echo "Document upload: Create a Knowledge collection in Open WebUI,"
 echo "upload PDFs, then reference them with # in chat. See README.md."
 echo ""
+echo "ABA compliance templates (in templates/ folder):"
+echo "  - client-disclosure.md   Client AI disclosure letter (Rule 1.4)"
+echo "  - firm-ai-policy.md      Firm AI usage policy (Rules 5.1/5.3)"
+echo ""
 echo "See README.md for:"
 echo "  - How to use document upload (RAG)"
 echo "  - Legal preset details and when to use each"
 echo "  - Tools setup and usage instructions"
-echo "  - Example prompts for legal work"
+echo "  - 20 curated prompt templates (prompts/legal-prompt-library.md)"
+echo "  - Optional Claude API setup for higher-quality analysis"
 echo "  - Important limitations to understand"
 echo "  - Troubleshooting tips"
 echo ""
