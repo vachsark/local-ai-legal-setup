@@ -254,7 +254,7 @@ The ABA Task Force on Law and Artificial Intelligence released its final report 
 | Verification    | Critical warnings throughout: never trust citations, verify everything |
 | Candor          | Models explicitly instructed not to fabricate citations                |
 
-**What you'd still need for a firm setting**: written AI use policies, client disclosure templates, training documentation, and supervisory oversight procedures.
+**What you'd still need for a firm setting**: written AI use policies, client disclosure templates, training documentation, and supervisory oversight procedures. See the [Templates](#templates-aba-compliance) section below for ready-to-use starting points.
 
 ### Further Reading
 
@@ -262,6 +262,87 @@ The ABA Task Force on Law and Artificial Intelligence released its final report 
 - [Breaking Down ABA's AI Guidance](https://www.2civility.org/breaking-down-the-abas-guidance-on-using-generative-ai-in-legal-practice/)
 - [ABA Ethics Opinion Framework](https://www.americanbar.org/groups/business_law/resources/business-law-today/2024-october/aba-ethics-opinion-generative-ai-offers-useful-framework/)
 - [ABA AI Task Force Report](https://www.americanbar.org/news/abanews/aba-news-archives/2025/12/aba-ai-task-force-report-examines-opportunities-challenges/)
+
+---
+
+## Templates (ABA Compliance)
+
+Two ready-to-use templates are included in the `templates/` folder for firms implementing AI in compliance with ABA guidance.
+
+### templates/client-disclosure.md
+
+Sample engagement letter language for AI disclosure per ABA Rule 1.4 (Communication):
+
+- What AI tools are used and for what tasks
+- What AI is NOT used for (final legal judgment, privileged analysis)
+- Data handling options (local-only vs. cloud, with fill-in-the-blank)
+- Client consent acknowledgment with signature line
+- Billing disclosure options
+- Fill-in-the-blank format: `[FIRM NAME]`, `[CLIENT NAME]`, etc.
+
+### templates/firm-ai-policy.md
+
+Sample firm AI usage policy per ABA Rules 5.1/5.3 (Supervisory Responsibilities):
+
+- Approved tools and configurations table
+- Prohibited uses (filing AI output directly, client data in non-approved tools)
+- Verification requirements (all citations, all legal standards, all facts)
+- Competence requirements with training checklist
+- Client data classification matrix
+- Supervisory chain and incident reporting procedures
+- Annual review schedule with checklist
+
+Both templates are designed to be customized — replace bracketed fields with firm-specific information and have ethics counsel review before adoption.
+
+---
+
+## Prompt Library
+
+A library of 20 curated prompt templates is included in `prompts/legal-prompt-library.md`, organized by task type:
+
+| Category               | Prompts | Recommended Model                 |
+| ---------------------- | ------- | --------------------------------- |
+| Contract Review        | 5       | contract-reviewer                 |
+| Deposition / Testimony | 3       | depo-summarizer                   |
+| Memo Drafting          | 3       | memo-drafter                      |
+| Clause Analysis        | 3       | contract-reviewer / mistral-small |
+| Writing Review         | 3       | legal-reviewer / gemma3:12b       |
+| General                | 3       | mistral-small / gemma3:12b        |
+
+Each prompt includes the template text (copy-paste ready), which model/preset to use, and what to expect in the output. Open `prompts/legal-prompt-library.md` for the full library.
+
+---
+
+## Optional: Claude API (Quality Tier)
+
+For high-stakes analysis where accuracy matters more than privacy constraints, you can add Anthropic's Claude as a cloud model provider. Claude models are significantly more capable than local models for complex legal reasoning.
+
+### Setup
+
+1. Go to **Admin Panel** → **Connections** → **OpenAI** → **Add Connection**
+2. **URL**: `https://api.anthropic.com/v1`
+3. **API Key**: Get one from [console.anthropic.com](https://console.anthropic.com)
+4. Claude models auto-appear in the model dropdown — no restart needed
+
+### Model Tiers
+
+| Tier            | Model             | Cost      | Use Case                                |
+| --------------- | ----------------- | --------- | --------------------------------------- |
+| Fast (local)    | gemma3:12b        | Free      | Summaries, drafting, reformatting       |
+| Careful (local) | qwen3:14b         | Free      | Contracts, structured analysis          |
+| Heavy (local)   | mistral-small:24b | Free      | Complex reasoning, memos                |
+| Quality (cloud) | Claude Sonnet     | ~$3/MTok  | High-stakes analysis, nuanced reasoning |
+| Best (cloud)    | Claude Opus       | ~$15/MTok | Critical work product, final review     |
+
+### ABA Considerations
+
+Adding Claude API means **data leaves your machine**. While Anthropic does not train on API data and deletes inputs after processing, this changes the privacy model:
+
+- **ABA Rule 1.6 (Confidentiality)**: You need informed client consent before sending client data to cloud AI providers. Use the client disclosure template in `templates/client-disclosure.md`.
+- **Firm policy**: Update your AI usage policy to classify which matters/data types can use cloud models. See `templates/firm-ai-policy.md` for the data classification matrix.
+- **When to use cloud vs. local**: Use local models for routine work and any matter where data sensitivity is a concern. Reserve cloud models for complex analysis where the quality improvement justifies the data handling implications.
+
+> **Note**: The setup scripts do not auto-configure Claude API. API keys should be entered through the Open WebUI Admin Panel UI, not stored in config files or scripts.
 
 ---
 
@@ -422,6 +503,7 @@ Output is organized into: Critical Issues, Style Improvements, Consistency Notes
 | Formal memo or detailed analysis  | memo-drafter                                      |
 | Clause inventory and risk mapping | clause-identifier                                 |
 | Proofread a brief or contract     | legal-reviewer                                    |
+| High-stakes analysis (cloud)      | Claude Sonnet or Opus (see below)                 |
 | Anything else                     | Start with base model, switch to preset if needed |
 
 ---
@@ -473,6 +555,46 @@ Calculates standard readability metrics (Flesch-Kincaid, Gunning Fog, SMOG, Cole
 Compares two uploaded files side-by-side. Produces a similarity percentage, line-level additions/deletions count, and a unified diff (capped at 500 lines to protect the context window). The LLM interprets the legal significance of each change.
 
 **Usage**: Enable the tool, attach two document files to your message, then ask: "Compare these two versions and explain what changed"
+
+### citation-checker
+
+**Requires**: Nothing extra (uses Python stdlib)
+
+Scans AI-generated legal text for anything that looks like a legal citation and flags every instance for human verification. Prioritizes high recall — better to over-flag than miss a fabricated citation. Addresses ABA Rules 3.3 (candor) and 1.1 (competence).
+
+**Detection patterns**:
+
+- Case citations: `v.` pattern + volume/reporter/page (e.g., `123 F.3d 456 (9th Cir. 2020)`)
+- Federal reporters: U.S., S.Ct., L.Ed., F., F.2d, F.3d, F.4th, F.Supp., and variants
+- State reporters: Cal.App., N.Y.S., P.2d, A.2d, regional reporters
+- Statutes: U.S.C., C.F.R., state statute patterns
+- Bluebook signals: See, See also, Cf., But see, Compare, See generally
+
+**Red flags** (higher severity):
+
+- Non-existent reporters (F.5th, U.S.R.)
+- Impossible volumes (>600 for U.S. Reports)
+- Court/reporter mismatches (F.3d with district court parenthetical)
+- Round-number suspicious patterns
+- Case names without reporter citations
+
+**Output**: JSON with `citations_found[]` (each with text, type, position, red_flags) and `summary` (total, high_risk_count, recommendation).
+
+**Usage**: Enable the tool, then ask: "Check this text for citations that need verification: [paste AI-generated legal text]"
+
+### ai-disclaimer
+
+**Requires**: Nothing extra (uses Python stdlib)
+
+Appends a configurable disclaimer to AI-generated output. Addresses ABA Rules 3.3 (candor) and 1.4 (communication).
+
+**Configurable valves** (adjust in Open WebUI > Workspace > Tools > ai-disclaimer > Valves):
+
+- `disclaimer_text`: Customizable text (default: "AI-GENERATED DRAFT — Requires attorney review...")
+- `include_timestamp`: Add generation timestamp (default: on)
+- `include_model_name`: Add model name used (default: on)
+
+**Usage**: Enable the tool, then ask: "Add a disclaimer to this draft: [paste text]"
 
 ---
 
