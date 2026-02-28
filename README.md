@@ -918,7 +918,36 @@ ollama pull modelname:size
 
 The model appears in the Open WebUI dropdown automatically.
 
-### Update
+### Update This Repo (Presets, Tools, Templates)
+
+If you already ran setup and want to pull new changes (updated Modelfiles, new tools, etc.):
+
+```bash
+cd local-ai-legal-setup
+git pull
+```
+
+Then apply what changed:
+
+**1. Recreate legal presets** (if any Modelfile changed):
+
+```bash
+for name in contract-reviewer depo-summarizer memo-drafter clause-identifier legal-reviewer; do
+  ollama create "$name" -f "Modelfile.$name"
+done
+```
+
+Ollama presets are baked at creation time — pulling new Modelfiles doesn't update them until you re-run `ollama create`. This is fast (no download, just rebuilds the system prompt).
+
+**2. Import new tools** (if new `.py` files appeared in `tools/`):
+
+Open WebUI > Workspace > Tools > **+** > paste the file contents > Save. Existing tools can be updated by opening them in the tool editor and replacing the contents.
+
+**3. Everything else** (templates, prompts, README) is just reference material — no installation needed.
+
+> **You do NOT need to re-run setup.sh.** The setup script is only for fresh installs (Ollama, Docker, model downloads). Repo updates are just `git pull` + the steps above.
+
+### Update Software (Ollama, Open WebUI)
 
 ```bash
 # Update Ollama (Arch Linux)
