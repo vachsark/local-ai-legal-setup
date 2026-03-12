@@ -2,8 +2,8 @@
 
 Private, local AI that runs entirely on your machine. After initial setup (which downloads models from the internet), all AI inference is local — no API calls, no cloud services.
 
-**Hardware**: AMD RX 9070 XT (16GB VRAM), Arch Linux (Windows script also included)
-**Stack**: Ollama (model server) + Open WebUI (chat interface)
+**Hardware**: AMD RX 9070 XT (16GB VRAM) on Linux, or Apple Silicon Mac (M1/M2/M3/M4, 16GB+ RAM)
+**Stack**: Ollama (model server) + Open WebUI (chat interface) + `legal-check` CLI
 
 ---
 
@@ -15,6 +15,17 @@ Private, local AI that runs entirely on your machine. After initial setup (which
 chmod +x setup.sh
 ./setup.sh
 ```
+
+### macOS (Apple Silicon)
+
+```bash
+chmod +x setup-mac.sh
+./setup-mac.sh
+```
+
+Requires an Apple Silicon Mac (M1/M2/M3/M4) with 16GB+ RAM. 32GB+ recommended for all models. Uses Metal GPU acceleration via Ollama — no Docker required for the AI models.
+
+The script installs Homebrew (if needed), Ollama, downloads models (RAM-aware — skips the largest model if under 32GB), builds all grammar checker presets, installs the `legal-check` CLI, and optionally sets up Open WebUI via Docker.
 
 ### Windows
 
@@ -505,6 +516,66 @@ Output is organized into: Critical Issues, Style Improvements, Consistency Notes
 | Proofread a brief or contract     | legal-reviewer                                    |
 | High-stakes analysis (cloud)      | Claude Sonnet or Opus (see below)                 |
 | Anything else                     | Start with base model, switch to preset if needed |
+
+---
+
+## Grammar Checker CLI (`legal-check`)
+
+A command-line grammar and style checker purpose-built for legal writing. Runs entirely through Ollama — no browser needed.
+
+### Quick Start
+
+```bash
+# Full grammar review (default)
+legal-check file.txt
+
+# Specific modes
+legal-check -m email email.txt           # Quick email polish
+legal-check -m brief motion.txt          # Court filing proofreader
+legal-check -m contract agreement.txt    # Contract precision & ambiguity
+legal-check -m plain clause.txt          # Plain-language rewrite
+
+# Clipboard and pipe
+legal-check -c                           # Check clipboard contents
+cat doc.txt | legal-check               # Pipe text in
+legal-check -c -m email                 # Clipboard with specific mode
+```
+
+### Modes
+
+| Mode       | Model Used        | Speed  | Best For                          |
+| ---------- | ----------------- | ------ | --------------------------------- |
+| `grammar`  | legal-reviewer    | ~40t/s | Full 7-point legal writing review |
+| `email`    | email-polisher    | ~50t/s | Quick email tone and grammar      |
+| `brief`    | brief-reviewer    | ~40t/s | Court filing proofreader          |
+| `contract` | contract-language | ~40t/s | Contract precision and ambiguity  |
+| `plain`    | plain-language    | ~50t/s | Legalese to plain English rewrite |
+
+### Grammar Checker Models
+
+Five specialized grammar/style models are built from Ollama Modelfiles during setup:
+
+- **legal-reviewer** (qwen3:14b) — Full 7-point checklist: grammar, legal vocabulary preservation, defined terms, citation flagging, style, tone, readability
+- **email-polisher** (gemma3:12b) — Fast email check: tone, grammar, privilege risks, binding language warnings
+- **brief-reviewer** (qwen3:14b) — Court filing proofreader: Bluebook citations, argument structure, formality
+- **contract-language** (qwen3:14b) — Contract precision: shall/may/must usage, defined terms, ambiguity detection
+- **plain-language** (gemma3:12b) — Rewrites legalese into clear, readable English
+
+To rebuild models manually:
+
+```bash
+./build-models.sh
+```
+
+### Options
+
+```
+-m MODE     Model to use (grammar, email, brief, contract, plain)
+-c          Read from clipboard (pbpaste on Mac, xclip/wl-paste on Linux)
+-r          Raw output (no formatting/colors)
+-v          Verbose (show model, timing)
+-h          Help
+```
 
 ---
 

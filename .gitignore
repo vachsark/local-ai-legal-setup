@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+training-data/generation.log
+training-data/output-batch-*.jsonl
+training-data/batch-*.jsonl

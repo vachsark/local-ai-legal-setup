@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# legal-check — Quick grammar/style checker for legal writing via Ollama
+# Usage:
+#   legal-check file.txt                    # Check a file (default: grammar review)
+#   cat email.txt | legal-check             # Pipe text in
+#   legal-check -m email file.txt           # Use email-polisher model
+#   legal-check -m brief motion.txt         # Use brief-reviewer model
+#   legal-check -m contract agreement.txt   # Use contract-language model
+#   legal-check -m plain clause.txt         # Use plain-language translator
+#   legal-check -c                          # Check clipboard contents
+#   legal-check -c -m email                 # Check clipboard with specific model
+
+set -euo pipefail
+
+# Model mapping
+declare -A MODELS=(
+    [grammar]="legal-reviewer"
+    [email]="email-polisher"
+    [brief]="brief-reviewer"
+    [contract]="contract-language"
+    [plain]="plain-language"
+    [ft]="legalgrammar"
+)
+
+MODEL_KEY="grammar"
+USE_CLIPBOARD=false
+VERBOSE=false
+RAW_OUTPUT=false
+INPUT_FILE=""
+
+usage() {
+    cat <<'USAGE'
+legal-check — Grammar & style checker for legal writing
+
+USAGE:
+  legal-check [OPTIONS] [FILE]
+  cat document.txt | legal-check [OPTIONS]
+
+OPTIONS:
+  -m MODE    Model to use (default: grammar)
+               grammar   Full 7-point legal writing review (qwen3:14b)
+               email     Quick email polish (gemma3:12b, fastest)
+               brief     Court filing proofreader (qwen3:14b)
+               contract  Contract precision & ambiguity (qwen3:14b)
+               plain     Plain-language rewrite (gemma3:12b)
+  -c         Read from clipboard (xclip/xsel/wl-paste)
+  -r         Raw output (no formatting/colors)
+  -v         Verbose (show model, token count, timing)
+  -h         Show this help
+
+EXAMPLES:
+  legal-check brief.txt                    # Full grammar review
+  legal-check -m email email.txt           # Quick email check
+  legal-check -m brief motion.docx.txt     # Brief review
+  cat clause.txt | legal-check -m contract # Contract precision check
+  legal-check -c -m email                  # Check clipboard email
+  legal-check -m plain lease-section.txt   # Plain-language rewrite
+
+SETUP:
+  cd /path/to/local-ai-legal-setup
+  ./build-models.sh        # Build all grammar models
+  # Or build individually:
+  ollama create legal-reviewer -f Modelfile.legal-reviewer
+  ollama create email-polisher -f Modelfile.email-polisher
+USAGE
+    exit 0
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -m|--model)
+            MODEL_KEY="$2"
+            if [[ -z "${MODELS[$MODEL_KEY]+x}" ]]; then
+                echo "Error: Unknown model '$MODEL_KEY'. Options: ${!MODELS[*]}" >&2
+                exit 1
+            fi
+            shift 2
+            ;;
+        -c|--clipboard)
+            USE_CLIPBOARD=true
+            shift
+            ;;
+        -r|--raw)
+            RAW_OUTPUT=true
+            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            usage
+            ;;
+        *)
+            INPUT_FILE="$1"
+            shift
+            ;;
+    esac
+done
+
+MODEL="${MODELS[$MODEL_KEY]}"
+
+# Get input text
+get_clipboard() {
+    if command -v pbpaste &>/dev/null; then
+        pbpaste 2>/dev/null
+    elif command -v wl-paste &>/dev/null; then
+        wl-paste 2>/dev/null
+    elif command -v xclip &>/dev/null; then
+        xclip -selection clipboard -o 2>/dev/null
+    elif command -v xsel &>/dev/null; then
+        xsel --clipboard --output 2>/dev/null
+    else
+        echo "Error: No clipboard tool found. On Mac: pbpaste (built-in). On Linux: wl-paste, xclip, or xsel." >&2
+        exit 1
+    fi
+}
+
+if [[ "$USE_CLIPBOARD" == true ]]; then
+    TEXT=$(get_clipboard)
+    SOURCE="clipboard"
+elif [[ -n "$INPUT_FILE" ]]; then
+    if [[ ! -f "$INPUT_FILE" ]]; then
+        echo "Error: File not found: $INPUT_FILE" >&2
+        exit 1
+    fi
+    TEXT=$(cat "$INPUT_FILE")
+    SOURCE="$INPUT_FILE"
+elif [[ ! -t 0 ]]; then
+    TEXT=$(cat)
+    SOURCE="stdin"
+else
+    echo "Error: No input provided. Use a file, pipe, or -c for clipboard." >&2
+    echo "Run 'legal-check -h' for help." >&2
+    exit 1
+fi
+
+if [[ -z "$TEXT" ]]; then
+    echo "Error: Input is empty." >&2
+    exit 1
+fi
+
+# Check if model exists
+if ! (ollama list 2>/dev/null || true) | grep -q "${MODEL}"; then
+    echo "Error: Model '$MODEL' not found. Build it first:" >&2
+    echo "  ollama create $MODEL -f Modelfile.$MODEL" >&2
+    echo "  # Or run: ./build-models.sh" >&2
+    exit 1
+fi
+
+# Word/char count
+WORD_COUNT=$(echo "$TEXT" | wc -w | tr -d ' ')
+CHAR_COUNT=$(echo "$TEXT" | wc -c | tr -d ' ')
+
+# Header
+if [[ "$RAW_OUTPUT" != true ]]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  legal-check [$MODEL_KEY] — $SOURCE"
+    echo "  ${WORD_COUNT} words, ${CHAR_COUNT} chars"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+fi
+
+# Run the model
+START_TIME=$(date +%s%N)
+
+RESPONSE=$(ollama run "$MODEL" <<< "$TEXT" 2>/dev/null)
+
+END_TIME=$(date +%s%N)
+ELAPSED_MS=$(( (END_TIME - START_TIME) / 1000000 ))
+
+# Strip empty think tags from Qwen3 models
+RESPONSE=$(echo "$RESPONSE" | sed '/^<think>$/,/^<\/think>$/d' | sed '/^$/N;/^\n$/d')
+
+echo "$RESPONSE"
+
+# Footer
+if [[ "$VERBOSE" == true && "$RAW_OUTPUT" != true ]]; then
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    ELAPSED_SEC=$(awk "BEGIN {printf \"%.1f\", $ELAPSED_MS / 1000}")
+    echo "  Model: $MODEL | Time: ${ELAPSED_SEC}s"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+fi
