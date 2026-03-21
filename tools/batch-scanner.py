@@ -16,6 +16,7 @@ CLI usage:
 
 import argparse
 import csv
+import hashlib
 import io
 import json
 import os
@@ -25,6 +26,49 @@ import sys
 from datetime import date
 from pathlib import Path
 from typing import Optional
+
+
+# ── Content-hash disk cache ────────────────────────────────────────────────────
+# Each document gets a SHA-256 hash of its raw bytes. Results are cached in a
+# JSON file alongside the output so re-runs only process changed/new documents.
+# This is more reliable than file-list based --resume: if you edit a contract
+# the hash changes, forcing reprocessing even if the filename is unchanged.
+
+def _doc_hash(path: Path) -> str:
+    """SHA-256 of raw file bytes, hex-encoded (first 16 chars for brevity)."""
+    try:
+        h = hashlib.sha256(path.read_bytes()).hexdigest()
+        return h[:16]
+    except Exception:
+        return ""
+
+
+def _cache_path(output_path: Optional[Path]) -> Optional[Path]:
+    """Derive cache file path from output path (.cache.json suffix)."""
+    if not output_path:
+        return None
+    return output_path.with_suffix(".cache.json")
+
+
+def load_hash_cache(cache_file: Optional[Path]) -> dict[str, dict]:
+    """Load {doc_hash: result_dict} from the cache file."""
+    if not cache_file or not cache_file.exists():
+        return {}
+    try:
+        entries = json.loads(cache_file.read_text())
+        return {e["_hash"]: e for e in entries if "_hash" in e}
+    except Exception:
+        return {}
+
+
+def save_hash_cache(cache_file: Optional[Path], results: list[dict]) -> None:
+    """Persist results (those that have a _hash field) to the cache file."""
+    if not cache_file:
+        return
+    try:
+        cache_file.write_text(json.dumps(results, indent=2))
+    except Exception:
+        pass
 
 
 # ── Text extraction ────────────────────────────────────────────────────────────
@@ -662,54 +706,79 @@ def process_batch(
     total = len(docs)
     print(f"  Found {total} document(s) in {directory}", file=sys.stderr)
 
-    # Resume: load partial results if output exists
-    partial_results: dict[str, dict] = {}
+    # Content-hash cache: keyed by SHA-256 of file bytes (first 16 hex chars).
+    # Falls back to name-based --resume for backwards compatibility.
+    cache_file = _cache_path(output_path)
+    hash_cache: dict[str, dict] = {}  # hash → result
+    name_cache: dict[str, dict] = {}  # doc_name → result (legacy resume)
+
     if resume:
         if not output_path:
             print(
-                "  Warning: --resume requires --output <file> to locate the state file. "
+                "  Warning: --resume requires --output <file> to locate the cache. "
                 "Resume skipped — starting fresh.",
                 file=sys.stderr,
             )
-        elif output_path.exists():
-            # We store partial JSON alongside the report
-            state_path = output_path.with_suffix(".state.json")
-            if state_path.exists():
-                try:
-                    partial_results = {
-                        r["doc"]: r
-                        for r in json.loads(state_path.read_text())
-                    }
-                    print(f"  Resuming — {len(partial_results)} already done", file=sys.stderr)
-                except Exception as e:
-                    print(f"  Warning: could not load resume state: {e}", file=sys.stderr)
+        else:
+            # Load content-hash cache (new format)
+            hash_cache = load_hash_cache(cache_file)
+            if hash_cache:
+                print(f"  Cache: {len(hash_cache)} hashed result(s) loaded", file=sys.stderr)
+            else:
+                # Fall back to legacy state file (name-based)
+                state_path_legacy = output_path.with_suffix(".state.json")
+                if state_path_legacy.exists():
+                    try:
+                        name_cache = {
+                            r["doc"]: r
+                            for r in json.loads(state_path_legacy.read_text())
+                        }
+                        print(
+                            f"  Resuming (legacy name cache) — "
+                            f"{len(name_cache)} already done",
+                            file=sys.stderr,
+                        )
+                    except Exception as e:
+                        print(f"  Warning: could not load resume state: {e}", file=sys.stderr)
 
     results = []
-    state_path = output_path.with_suffix(".state.json") if output_path else None
+    cache_entries: list[dict] = []  # accumulate for cache write
 
     for i, doc_path in enumerate(docs, 1):
         doc_name = doc_path.name
         print_progress(i, total, doc_name)
 
-        # Resume: skip if already processed
-        if doc_name in partial_results:
-            results.append(partial_results[doc_name])
+        # Check content-hash cache first
+        doc_hash = _doc_hash(doc_path)
+        if doc_hash and doc_hash in hash_cache:
+            cached = hash_cache[doc_hash]
+            results.append(cached)
+            cache_entries.append(cached)
+            continue
+
+        # Fall back to legacy name-based resume
+        if doc_name in name_cache:
+            entry = name_cache[doc_name]
+            # Promote to hash cache by tagging it
+            entry["_hash"] = doc_hash
+            results.append(entry)
+            cache_entries.append(entry)
             continue
 
         text, warning = extract_text_from_path(doc_path)
 
         if not text.strip():
-            results.append({
+            result: dict = {
                 "doc": doc_name,
                 "skipped": True,
                 "error": warning or "empty document",
-            })
+            }
         else:
             if mode == "risk":
                 signals = extract_risk_signals(text, focus_terms)
                 risk_level = score_risk(signals)
                 parties = extract_parties(text)
-                result: dict = {
+                result = {
                     "doc": doc_name,
                     "risk_level": risk_level,
                     "signals": signals,
@@ -736,15 +805,19 @@ def process_batch(
                 }
                 if warning:
                     result["warning"] = warning
+            else:
+                result = {"doc": doc_name, "skipped": True, "error": f"unknown mode: {mode}"}
 
-            results.append(result)
+        # Tag with content hash for cache
+        if doc_hash:
+            result["_hash"] = doc_hash
 
-        # Write incremental state for resume
-        if state_path:
-            try:
-                state_path.write_text(json.dumps(results, indent=2))
-            except Exception:
-                pass
+        results.append(result)
+        cache_entries.append(result)
+
+        # Write incremental hash cache (replaces legacy state file)
+        if cache_file:
+            save_hash_cache(cache_file, cache_entries)
 
     # Generate report
     if mode == "risk":
@@ -757,12 +830,14 @@ def process_batch(
         else:
             report = format_terms_report_md(results)
 
-    # Clean up state file on success
-    if state_path and state_path.exists():
+    # Clean up legacy state file if it exists (replaced by hash cache)
+    legacy_state = output_path.with_suffix(".state.json") if output_path else None
+    if legacy_state and legacy_state.exists():
         try:
-            state_path.unlink()
+            legacy_state.unlink()
         except Exception:
             pass
+    # Note: hash cache file (.cache.json) is intentionally kept for future runs.
 
     return report
 
@@ -897,7 +972,11 @@ Examples:
     parser.add_argument(
         "--resume",
         action="store_true",
-        help="Resume an interrupted scan (requires --output)",
+        help=(
+            "Skip documents whose content hash matches the cache from a previous run. "
+            "Only re-processes changed or new files (requires --output). "
+            "More reliable than file-name resuming: editing a contract forces reprocessing."
+        ),
     )
 
     args = parser.parse_args()

@@ -237,8 +237,8 @@ class Tools:
             min(self.valves.max_chunks_cap, len(chunks) // 15),
         )
 
-        # Retrieve relevant chunks
-        top_chunks = self._retrieve(query, chunks, scaled_max)
+        # Retrieve relevant chunks — iterative two-pass retrieval
+        top_chunks = self._retrieve_iterative(query, chunks, scaled_max)
 
         if not top_chunks:
             if __event_emitter__:
@@ -276,29 +276,40 @@ class Tools:
                 }
             )
 
+        # Build excerpts with document boundary markers so the model knows
+        # exactly which document and section each chunk originates from.
+        excerpts = []
+        for i, chunk in enumerate(top_chunks, start=1):
+            excerpts.append({
+                "excerpt_number": i,
+                "document": filename,
+                "citation": chunk["citation"],
+                "score": round(chunk["score"], 4),
+                # Boundary markers: unambiguous delimiters even when context is long
+                "text": (
+                    f"[DOCUMENT: {filename} | SOURCE: {chunk['citation']}]\n"
+                    + chunk["text"]
+                    + f"\n[END: {chunk['citation']}]"
+                ),
+            })
+
         output = {
             "document": filename,
             "query": query,
-            "retrieval_mode": retrieval_mode,
+            "retrieval_mode": f"iterative_{retrieval_mode}",
             "embedding_model": self._embed_model if self._embed_available else None,
             "total_sections_searched": len(chunks),
             "relevant_sections_found": len(top_chunks),
             "answer_instruction": (
                 "Answer the query ONLY using the document excerpts below. "
-                "For every fact in your answer, cite the section using the "
-                "'citation' field (e.g., 'See Section 3.2, paragraph 2'). "
+                "Each excerpt is wrapped in [DOCUMENT: ...] / [END: ...] markers "
+                "that identify its source. For every fact in your answer, cite the "
+                "section using the 'citation' field (e.g., 'See Section 3.2, paragraph 2'). "
                 "If the answer is not in these excerpts, say: "
                 "'This information was not found in the document.' "
                 "Never fabricate or infer beyond what the text states."
             ),
-            "excerpts": [
-                {
-                    "citation": chunk["citation"],
-                    "score": round(chunk["score"], 4),
-                    "text": chunk["text"],
-                }
-                for chunk in top_chunks
-            ],
+            "excerpts": excerpts,
         }
 
         return json.dumps(output, indent=2)
@@ -608,6 +619,105 @@ class Tools:
             return self._retrieve_hybrid(query, chunks, top_k)
         else:
             return self._retrieve_bm25(query, chunks, top_k)
+
+    def _extract_expansion_terms(self, chunks: list, original_query: str) -> list[str]:
+        """
+        Extract high-value terms from first-pass results for query expansion.
+
+        Pulls: section references (e.g. "Section 7"), capitalized legal terms,
+        domain-specific terms not already in the query. Returns up to 8 terms.
+        """
+        query_tokens = set(self._tokenize(original_query))
+        terms: list[str] = []
+        seen: set[str] = set()
+
+        for chunk in chunks[:4]:  # only inspect top chunks
+            text = chunk.get("text", "")
+            section = chunk.get("section", "")
+
+            # Section number references: "Section 7", "Section 3.2", "Article IV"
+            for m in re.finditer(
+                r'\b(?:Section|SECTION|Article|ARTICLE|Clause|CLAUSE)\s+'
+                r'(\d{1,3}(?:\.\d{1,3}){0,2}|[IVXivx]{1,6})\b',
+                text,
+            ):
+                term = m.group(0)
+                if term not in seen:
+                    terms.append(term)
+                    seen.add(term)
+
+            # Quoted or parenthetical defined terms: ("Indemnified Party")
+            for m in re.finditer(
+                r'["\u201c\u201d]([A-Z][A-Za-z ]{2,40})["\u201c\u201d]'
+                r'|\((?:the\s+)?["\u201c]([A-Z][A-Za-z ]{2,40})["\u201d]\)',
+                text,
+            ):
+                term = (m.group(1) or m.group(2) or "").strip()
+                if term and term.lower() not in seen:
+                    tok = self._tokenize(term)
+                    if tok and tok[0] not in query_tokens:
+                        terms.append(term)
+                        seen.add(term.lower())
+
+            # All-caps legal keywords (INDEMNIFICATION, LIMITATION, etc.)
+            for m in re.finditer(r'\b([A-Z]{4,30})\b', text):
+                word = m.group(1)
+                if word.lower() not in seen and self._tokenize(word):
+                    norm = self._LEGAL_STEM_MAP.get(word.lower(), word.lower())
+                    if norm not in query_tokens:
+                        terms.append(word.lower())
+                        seen.add(word.lower())
+
+            # Current section header (always relevant)
+            if section and section not in seen:
+                terms.append(section)
+                seen.add(section)
+
+        return terms[:8]
+
+    def _retrieve_iterative(self, query: str, chunks: list, top_k: int) -> list:
+        """
+        Two-pass iterative retrieval (MSA-inspired).
+
+        Pass 1: standard hybrid/BM25 retrieval with the original query.
+        Extract: key terms, section references, and defined terms from results.
+        Pass 2: retrieve again with an expanded query built from extracted terms.
+        Merge: RRF-fuse both result sets and return top-k deduplicated chunks.
+
+        This catches cross-references that the first pass misses when the
+        query vocabulary doesn't overlap with the referenced section.
+        """
+        # Pass 1 — standard retrieval
+        if self._embed_available:
+            pass1 = self._retrieve_hybrid(query, chunks, top_k)
+        else:
+            pass1 = self._retrieve_bm25(query, chunks, top_k)
+
+        if not pass1:
+            return pass1
+
+        # Extract expansion terms from pass-1 results
+        expansion_terms = self._extract_expansion_terms(pass1, query)
+        if not expansion_terms:
+            return pass1  # nothing to expand with — single pass is fine
+
+        # Build expanded query: original + extracted terms
+        expanded_query = query + " " + " ".join(expansion_terms)
+
+        # Pass 2 — retrieval with expanded query
+        # Exclude chunks already in pass-1 to maximise new coverage
+        pass1_idxs = {c["_idx"] for c in pass1}
+        if self._embed_available:
+            pass2_all = self._retrieve_hybrid(expanded_query, chunks, top_k * 2)
+        else:
+            pass2_all = self._retrieve_bm25(expanded_query, chunks, top_k * 2)
+
+        # New chunks discovered in pass 2 (not already in pass 1)
+        pass2_new = [c for c in pass2_all if c["_idx"] not in pass1_idxs]
+
+        # RRF-fuse pass1 and pass2 (all chunks, deduped by _idx)
+        fused = _rrf_fuse(pass1, pass2_new[:top_k], k=60)
+        return fused[:top_k]
 
     def _retrieve_bm25(self, query: str, chunks: list, top_k: int) -> list:
         """
