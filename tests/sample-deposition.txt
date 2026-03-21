@@ -1,0 +1,280 @@
+IN THE CIRCUIT COURT OF COOK COUNTY, ILLINOIS
+CIVIL DIVISION
+
+HARTWELL INDUSTRIES, INC.,
+    Plaintiff,
+
+vs.
+
+MERIDIAN LOGISTICS GROUP, LLC,
+    Defendant.
+
+Case No. 2024-L-008841
+
+DEPOSITION OF DANIEL R. KOWALSKI
+Taken on behalf of Plaintiff
+Date: October 14, 2024
+Location: 200 W. Adams Street, Suite 2400, Chicago, Illinois
+
+APPEARANCES:
+  For the Plaintiff:  JESSICA M. PARK, ESQ.
+                      Park & Thornton LLP
+  For the Defendant:  RAYMOND OCHOA, ESQ.
+                      Meridian Legal Department
+
+REPORTER: CAROL DIETZ, CSR
+
+
+                      EXAMINATION
+
+BY MS. PARK:
+
+Q: Please state your full name and current title for the record.
+
+A: Daniel Robert Kowalski. I'm the Vice President of Operations for Meridian Logistics Group.
+
+Q: How long have you held that title?
+
+A: About six years now. Since 2018.
+
+Q: And before that?
+
+A: I was Director of Warehouse Operations for about four years.
+
+Q: Mr. Kowalski, are you familiar with the Master Services Agreement between Meridian Logistics and Hartwell Industries, signed in January 2022?
+
+A: Yes, I am.
+
+Q: Were you involved in negotiating that agreement?
+
+A: I was involved in some of the operational discussions, yes.
+
+MR. OCHOA: Objection, vague.
+
+A: I mean, I attended some meetings. I didn't do the actual contract drafting.
+
+Q: Which meetings did you attend?
+
+A: I don't recall specifically. Several internal meetings, maybe one or two with Hartwell's team.
+
+Q: Do you recall discussing delivery time commitments during those meetings?
+
+A: In general terms, yes.
+
+Q: What do you recall about the delivery time commitments that were discussed?
+
+MR. OCHOA: Objection, calls for speculation.
+
+A: I remember there was discussion about 48-hour delivery windows for standard freight. That was the general framework we were working with.
+
+Q: Was a 72-hour window ever discussed as an alternative?
+
+A: Not that I recall.
+
+Q: I'm going to show you what I've marked as Plaintiff's Exhibit 3. Do you recognize this document?
+
+A: Yes, that looks like an internal email chain.
+
+Q: Who is it from?
+
+A: It's from me, to our contract team.
+
+Q: And what is the date on that email?
+
+A: December 12th, 2021.
+
+Q: Can you read the highlighted portion on page 2?
+
+A: It says, "Hartwell is pushing for 48-hour windows. We can do 72 on most lanes, but I don't think we need to fight them on this for now."
+
+Q: So in December 2021 you knew Meridian could not consistently meet 48-hour windows on most lanes?
+
+MR. OCHOA: Objection, mischaracterizes the document.
+
+A: That's not what I said. I said we could do 72 on most lanes. That doesn't mean we couldn't do 48 on some lanes.
+
+Q: But you specifically said "most lanes," correct?
+
+A: That was my assessment at the time, yes.
+
+Q: When the MSA was signed in January 2022, did you advise Hartwell's team that 48-hour windows might not be achievable on all lanes?
+
+A: I don't believe that was my role to advise them on that.
+
+Q: But you had that information, correct?
+
+A: I had my opinion at the time, yes.
+
+Q: Let's talk about the performance period from March to August 2023. Are you aware that Meridian's on-time delivery rate for Hartwell's freight dropped below 60% during that period?
+
+A: I'm aware there were some performance issues during that time.
+
+Q: Some issues. Are you aware of the specific figure of 59.3%?
+
+MR. OCHOA: Objection, foundation.
+
+A: I may have seen reports. I'd have to review them.
+
+Q: I'm showing you Plaintiff's Exhibit 7, which is Meridian's own internal performance dashboard for the Hartwell account from March through August 2023. Does this document refresh your recollection?
+
+A: Yes. I see the figures you're referring to.
+
+Q: And what does that dashboard show as the on-time delivery percentage for June 2023?
+
+A: It shows 54.1%.
+
+Q: Who was responsible for informing Hartwell of these performance failures?
+
+A: That would have been the account management team.
+
+Q: Were you informed of these performance failures?
+
+A: I received summary reports, yes.
+
+Q: When did you first receive a report showing Hartwell's on-time rate below the contractual threshold of 85%?
+
+MR. OCHOA: Objection, assumes facts not in evidence.
+
+A: I'm not sure I can give you an exact date without reviewing the documents.
+
+Q: Approximately?
+
+A: Sometime in the spring of 2023, I think. Maybe April or May.
+
+Q: You said "sometimes in the spring of 2023" but earlier you said you were only aware of "some performance issues." If you were receiving reports in April or May 2023 showing below-threshold performance, would you characterize that as just "some issues"?
+
+MR. OCHOA: Objection, argumentative.
+
+A: I was aware there were challenges. I wouldn't say I minimized it. It was a difficult operational period.
+
+Q: Did you personally communicate with anyone at Hartwell about these performance issues?
+
+A: I may have had conversations. I don't recall specifics.
+
+Q: Do you recall attending a meeting on July 18, 2023 with Hartwell's COO, Sandra Reeves?
+
+A: I'd have to check my calendar.
+
+Q: I'll represent to you that Hartwell has produced calendar invites and meeting minutes for a July 18, 2023 call. Does that refresh your recollection?
+
+A: If there are records of it, then I likely attended. I attend a lot of meetings.
+
+Q: At that meeting, did you tell Ms. Reeves that Meridian's performance issues were due to the labor shortage?
+
+MR. OCHOA: Objection, foundation.
+
+A: That may have been one of the factors discussed, yes.
+
+Q: Were there other factors you did not disclose to Ms. Reeves at that meeting?
+
+A: I'm not sure I understand the question.
+
+Q: Were there internal operational failures at Meridian's sorting facility in Joliet that contributed to the performance issues?
+
+MR. OCHOA: Objection, calls for a legal conclusion.
+
+A: There were certainly some issues at the Joliet facility.
+
+Q: What kind of issues?
+
+A: Equipment failures, mostly. Some scheduling challenges.
+
+Q: When did those equipment failures begin?
+
+A: I believe the conveyor system had problems starting around February 2023.
+
+Q: And the labor shortage you mentioned to Ms. Reeves — when did that become a factor?
+
+A: That was more in the summer, June, July.
+
+Q: So the performance degradation that began in March 2023 was occurring before the labor shortage you described to Ms. Reeves?
+
+MR. OCHOA: Objection, mischaracterizes prior testimony.
+
+A: The equipment issues contributed, yes. And there were other factors as well.
+
+Q: But you didn't mention the equipment failures to Ms. Reeves?
+
+A: I may not have gone into that level of detail.
+
+Q: You gave her one reason — labor shortage — and omitted the equipment failures that you now acknowledge started two months earlier?
+
+MR. OCHOA: Objection, argumentative. Asked and answered.
+
+A: I don't recall exactly what I said in that meeting. I would need to see the minutes.
+
+Q: Are you aware of any remediation plan Meridian put in place to address the Joliet facility equipment issues?
+
+A: Yes, we contracted for equipment repairs and upgrades.
+
+Q: When was that contract executed?
+
+A: I believe in September or October of 2023.
+
+Q: So six to eight months after the equipment failures began?
+
+A: That's approximately right.
+
+Q: Was there any earlier attempt to remediate the equipment failures before September 2023?
+
+A: We did some in-house repairs. Temporary fixes.
+
+Q: Were those temporary fixes documented?
+
+A: Some of them, yes. Through our maintenance logs.
+
+Q: Were those maintenance logs provided in response to Hartwell's discovery requests?
+
+MR. OCHOA: Objection. Calls for a legal conclusion.
+
+A: I'm not the right person to ask about discovery compliance.
+
+Q: Are you aware that Hartwell requested all maintenance records in their first set of discovery requests?
+
+A: I'm not familiar with the specific requests.
+
+Q: Is it your testimony that you have no involvement in responding to litigation hold notices or discovery in this case?
+
+A: I have involvement to the extent that I was asked to preserve documents. Beyond that, legal handles it.
+
+Q: You testified earlier that the performance issues were a "difficult operational period." Is it fair to say that during that period, Meridian continued to bill Hartwell at the full contract rate?
+
+MR. OCHOA: Objection, compound question.
+
+A: We continued to provide services and bill accordingly, yes.
+
+Q: Did Meridian provide any service credits or rate adjustments to Hartwell during the March to August 2023 performance period?
+
+A: Not that I'm aware of.
+
+Q: Does the MSA contain provisions for service level credits when performance falls below the 85% threshold?
+
+A: I believe there are some provisions, but I'd need to review the specific language.
+
+Q: I'll show you Section 8.3 of Plaintiff's Exhibit 1, the MSA. Can you read that provision?
+
+A: "In the event Carrier's on-time delivery performance falls below eighty-five percent (85%) for any calendar month, Shipper shall be entitled to a service credit equal to ten percent (10%) of that month's freight charges."
+
+Q: And Meridian did not issue those credits?
+
+A: I was not aware credits were being tracked or issued.
+
+Q: Whose responsibility was it to track and issue those credits?
+
+A: That would fall under our billing or account management departments.
+
+Q: Not your responsibility?
+
+A: Not directly, no.
+
+Q: Mr. Kowalski, is it your testimony today that you, as VP of Operations, were unaware that Meridian was failing to issue contractually required service credits to a major client?
+
+MR. OCHOA: Objection to the characterization. Mischaracterizes the record.
+
+A: I was focused on the operational side. Contract administration was handled by other departments.
+
+Q: I have no further questions at this time. I'll reserve the right to recall this witness pending review of documents.
+
+MR. OCHOA: We'll reserve as well.
+
+                    (Deposition concluded at 3:47 p.m.)

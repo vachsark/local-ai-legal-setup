@@ -273,12 +273,12 @@ Write-Step "5/10" "Downloading AI models (this takes a while)"
 Write-Host ""
 Write-Host "  Pulling 3 models for legal work + embedding model for document search:"
 Write-Host "    1. gemma3:12b       (8GB)   - Fast, great for summarization and drafting"
-Write-Host "    2. qwen3:14b        (9GB)   - Strong instruction following, structured analysis"
+Write-Host "    2. qwen3.5:9b        (9GB)   - Strong instruction following, structured analysis"
 Write-Host "    3. mistral-small    (14GB)  - Most capable, best for complex reasoning"
 Write-Host "    4. nomic-embed-text (274MB) - Embedding model for document upload (RAG)"
 Write-Host ""
 
-$models = @("gemma3:12b", "qwen3:14b")
+$models = @("gemma3:12b", "qwen3.5:9b")
 
 # Only pull mistral-small if we have enough VRAM
 if ($vramGB -ge 12 -or $vramGB -eq 0) {
@@ -593,17 +593,17 @@ if ($webUIInstalled) {
 Write-Host ""
 Write-Host "  Available models (select from dropdown in chat):" -ForegroundColor White
 Write-Host "    - gemma3:12b      Fast daily work, summaries, drafting"
-Write-Host "    - qwen3:14b       Structured analysis, detailed responses"
+Write-Host "    - qwen3.5:9b       Structured analysis, detailed responses"
 if ($vramGB -ge 12 -or $vramGB -eq 0) {
     Write-Host "    - mistral-small   Complex reasoning, best quality (slower)"
 }
 Write-Host ""
 Write-Host "  Legal presets (specialized system prompts):" -ForegroundColor White
-Write-Host "    - contract-reviewer  Contract analysis (qwen3:14b)"
+Write-Host "    - contract-reviewer  Contract analysis (qwen3.5:9b)"
 Write-Host "    - depo-summarizer    Deposition summaries (gemma3:12b)"
 Write-Host "    - memo-drafter       Legal memo drafting (mistral-small)"
-Write-Host "    - clause-identifier  Structured clause extraction (qwen3:14b)"
-Write-Host "    - legal-reviewer     Writing review and proofreading (qwen3:14b)"
+Write-Host "    - clause-identifier  Structured clause extraction (qwen3.5:9b)"
+Write-Host "    - legal-reviewer     Writing review and proofreading (qwen3.5:9b)"
 Write-Host ""
 Write-Host "  Tools (import manually in Open WebUI > Workspace > Tools > +):" -ForegroundColor White
 Write-Host "    - legal-grammar-checker    Grammar/style checking (needs LanguageTool)"

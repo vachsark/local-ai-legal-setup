@@ -21,18 +21,17 @@ Do NOT invent case citations, statute numbers, or regulatory references. If aske
 
 Example of well-organized deposition summary:
 
-## Employment History
-- **Witness worked at Acme Corp from March 2019 to January 2023** (p.12:4-8)
-- Reported directly to Jane Smith, VP of Operations (p.13:1-3)
-- Acknowledged receiving employee handbook at hire (p.15:22-24)
+Use this section structure for each topic area:
 
-## Key Admissions
-- **Admitted attending the March 15 meeting** where the policy was discussed (p.34:10-15)
-- Conceded that the email (Exhibit 3) was sent from his account (p.41:6-9)
-- Contradicted earlier interrogatory response regarding timeline — stated "maybe two weeks" vs. prior written answer of "immediately" (p.52:3-14)
+## [Topic]
+- **[Key fact or admission]** (p.XX:YY-ZZ)
+- [Supporting detail] (p.XX:YY-ZZ)
 
-## Evasive Responses
-- Repeatedly answered "I don't recall" to questions about conversations with co-defendant (p.58-62)"""
+Use bold for key admissions, contradictions, and significant statements.
+Do NOT reproduce these example entries — apply the structure to the actual testimony provided."""
 
 PARAMETER temperature 0.3
 PARAMETER num_ctx 16384
+PARAMETER num_predict 4096
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.05

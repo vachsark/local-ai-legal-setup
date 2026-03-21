@@ -1,0 +1,470 @@
+"""
+title: Document Summarizer
+author: local-ai-legal-setup
+version: 0.1.0
+license: MIT
+description: Upload a legal document and get a structured summary covering key parties, dates, financial terms, obligations, and potential risks. Works on contracts, depositions, briefs, and other legal documents.
+"""
+
+import json
+import re
+from typing import Optional
+
+from pydantic import BaseModel
+
+
+class Tools:
+    class Valves(BaseModel):
+        max_doc_chars: int = 150000
+        max_sections_preview: int = 30
+
+    def __init__(self):
+        self.valves = self.Valves()
+
+    async def summarize_document(
+        self,
+        __files__: Optional[list] = None,
+        __event_emitter__=None,
+    ) -> str:
+        """
+        Summarize an uploaded legal document. Extracts key parties, dates,
+        financial terms, obligations by party, and flags potential risks.
+        Upload a PDF, DOCX, or TXT file.
+
+        :return: Structured document summary for the LLM to present to the user.
+        """
+        if __event_emitter__:
+            await __event_emitter__(
+                {
+                    "type": "status",
+                    "data": {
+                        "description": "Loading document...",
+                        "done": False,
+                    },
+                }
+            )
+
+        if not __files__ or len(__files__) == 0:
+            return (
+                "No document uploaded. Please attach a PDF, DOCX, or TXT file "
+                "to your message using the paperclip icon, then ask me to summarize it."
+            )
+
+        file_obj = __files__[0]
+        filename = file_obj.get("filename", file_obj.get("name", "document"))
+
+        try:
+            text = self._extract_text(file_obj)
+        except Exception as e:
+            if __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {"description": "Failed to read file", "done": True},
+                    }
+                )
+            return f"Error reading file '{filename}': {str(e)}"
+
+        if not text or not text.strip():
+            return f"The document '{filename}' appears to be empty or could not be read."
+
+        # Truncate if enormous
+        truncated = len(text) > self.valves.max_doc_chars
+        if truncated:
+            text = text[: self.valves.max_doc_chars]
+
+        if __event_emitter__:
+            await __event_emitter__(
+                {
+                    "type": "status",
+                    "data": {
+                        "description": "Extracting structure...",
+                        "done": False,
+                    },
+                }
+            )
+
+        # Extract structured pre-analysis
+        parties = self._extract_parties(text)
+        dates = self._extract_dates(text)
+        financials = self._extract_financials(text)
+        sections = self._extract_sections(text)
+        risk_signals = self._extract_risk_signals(text)
+
+        if __event_emitter__:
+            await __event_emitter__(
+                {
+                    "type": "status",
+                    "data": {
+                        "description": "Analysis complete",
+                        "done": True,
+                    },
+                }
+            )
+
+        output = {
+            "document": filename,
+            "word_count": len(text.split()),
+            "truncated": truncated,
+            "pre_extracted": {
+                "parties_mentioned": parties,
+                "dates_and_deadlines": dates,
+                "financial_terms": financials,
+                "section_structure": sections[: self.valves.max_sections_preview],
+                "risk_signals": risk_signals,
+            },
+            "document_excerpt": text[:3000],
+            "summary_instruction": (
+                "Using the document excerpt and pre-extracted data above, produce a structured summary with these sections:\n"
+                "1. **Document Type & Purpose** — What kind of document is this and what does it do?\n"
+                "2. **Key Parties** — Who are the parties and what are their roles?\n"
+                "3. **Key Dates & Deadlines** — Effective date, expiration, notice periods, payment due dates.\n"
+                "4. **Financial Terms** — Amounts, caps, thresholds, payment schedules, penalties.\n"
+                "5. **Obligations by Party** — What each party must do (use bullet points per party).\n"
+                "6. **Potential Risks & Unusual Terms** — Flag anything non-standard, one-sided, or that requires attorney attention.\n"
+                "For each finding, cite the relevant section (e.g., 'Section 4.2').\n"
+                "If truncated is true, note that only the first portion of the document was analyzed."
+            ),
+        }
+
+        return json.dumps(output, indent=2)
+
+    # ── Text extraction (shared pattern with document-qa.py) ──────────────────
+
+    def _extract_text(self, file_obj: dict) -> str:
+        filename = file_obj.get("filename", file_obj.get("name", ""))
+
+        content = None
+        if "content" in file_obj:
+            content = file_obj["content"]
+        elif "data" in file_obj and isinstance(file_obj["data"], dict):
+            content = file_obj["data"].get("content", "")
+        elif "data" in file_obj and isinstance(file_obj["data"], str):
+            content = file_obj["data"]
+        elif "path" in file_obj:
+            return self._read_file_from_path(file_obj["path"], filename)
+
+        if content is None:
+            raise ValueError(
+                f"Could not extract text from '{filename}'. "
+                "Ensure the file is TXT or that Open WebUI has extracted its content."
+            )
+
+        if isinstance(content, str) and self._is_base64(content):
+            content = self._decode_base64_text(content, filename)
+
+        return content if isinstance(content, str) else str(content)
+
+    def _read_file_from_path(self, path: str, filename: str) -> str:
+        import subprocess
+
+        ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+        if ext == "pdf":
+            try:
+                result = subprocess.run(
+                    ["pdftotext", path, "-"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if result.returncode == 0:
+                    return result.stdout
+                raise ValueError(
+                    f"pdftotext failed (exit {result.returncode}): {result.stderr[:200]}"
+                )
+            except FileNotFoundError:
+                raise ValueError(
+                    "pdftotext not found. Install poppler-utils: "
+                    "'brew install poppler' (Mac) or 'apt install poppler-utils' (Linux)."
+                )
+        else:
+            with open(path, "r", errors="replace") as f:
+                return f.read()
+
+    def _is_base64(self, s: str) -> bool:
+        if len(s) < 100:
+            return False
+        sample = s[:200].strip()
+        b64_chars = set(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+        )
+        return all(c in b64_chars for c in sample if c not in "\n\r")
+
+    def _decode_base64_text(self, encoded: str, filename: str) -> str:
+        import base64
+        import subprocess
+        import tempfile
+        import os
+
+        data = base64.b64decode(encoded)
+        ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+
+        if ext == "pdf":
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp.write(data)
+                tmp_path = tmp.name
+            try:
+                result = subprocess.run(
+                    ["pdftotext", tmp_path, "-"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if result.returncode == 0:
+                    return result.stdout
+                raise ValueError(f"pdftotext failed: {result.stderr[:200]}")
+            except FileNotFoundError:
+                raise ValueError(
+                    "pdftotext not found. Install poppler-utils."
+                )
+            finally:
+                os.unlink(tmp_path)
+        else:
+            return data.decode("utf-8", errors="replace")
+
+    # ── Pre-extraction helpers ─────────────────────────────────────────────────
+
+    def _extract_parties(self, text: str) -> list:
+        """Find party definitions: 'Acme Corp. ("Client")', 'hereinafter "Vendor"', etc."""
+        parties = []
+        seen = set()
+
+        # Skip label roles that are not people/organizations
+        skip_labels = {
+            "agreement", "effective date", "term", "renewal term", "initial term",
+            "services", "platform", "client data", "confidential information",
+            "work product", "party", "parties",
+        }
+
+        # Strategy 1: Org name immediately before (the "Label") — same line
+        # e.g. "Acme Corp. ("Company")" or "Acme Corp., LLC (the "Vendor")"
+        for m in re.finditer(
+            r'([A-Z][A-Za-z0-9 &\',\.-]{1,60}'
+            r'(?:Inc|LLC|LLP|Corp|Ltd|Co|Company|Corporation|'
+            r'Association|Associates|Group|Partners|Foundation|Authority|Solutions|Services|Analytics)'
+            r'\.?)'
+            r'[,\s]*\((?:the\s+)?["\u201c\u2018]([A-Z][A-Za-z ]{1,30})["\u201d\u2019]\)',
+            text,
+        ):
+            full_name = m.group(1).strip().rstrip(", ")
+            label = m.group(2).strip()
+            key = label.lower()
+            if key in skip_labels:
+                continue
+            if key not in seen and len(full_name) > 3:
+                parties.append({"name": full_name, "role_label": label})
+                seen.add(key)
+
+        # Strategy 2: Multi-line pattern — org name on one line, label on a later line
+        # Scan paragraph blocks for org names near labels
+        paragraphs = re.split(r"\n\s*\n", text)
+        for para in paragraphs:
+            # Check if paragraph contains a label definition
+            label_m = re.search(
+                r'\((?:the\s+)?["\u201c\u2018]([A-Z][A-Za-z ]{1,30})["\u201d\u2019]\)', para
+            )
+            if not label_m:
+                continue
+            label = label_m.group(1).strip()
+            key = label.lower()
+            if key in skip_labels or key in seen:
+                continue
+            # Look for an org name in the same paragraph
+            org_m = re.search(
+                r'([A-Z][A-Za-z0-9 &\',\.-]{1,60}'
+                r'(?:Inc|LLC|LLP|Corp|Ltd|Co|Company|Corporation|'
+                r'Association|Associates|Group|Partners|Foundation|Authority|Solutions|Services|Analytics)'
+                r'\.?)',
+                para,
+            )
+            if org_m:
+                full_name = org_m.group(1).strip().rstrip(". ,")
+                # Skip if name looks like a sentence fragment or clause title
+                if re.search(r"\b(?:Indemnification|Liability|Termination|Payment|Clause|Section)\b", full_name):
+                    continue
+                if key not in seen and len(full_name) > 3:
+                    parties.append({"name": full_name, "role_label": label})
+                    seen.add(key)
+
+        # Pattern: "hereinafter referred to as the 'Buyer'"
+        for m in re.finditer(
+            r'hereinafter\s+(?:referred\s+to\s+as\s+)?(?:the\s+)?["\u201c]([A-Z][A-Za-z ]{1,30})["\u201d]',
+            text,
+        ):
+            label = m.group(1).strip()
+            key = label.lower()
+            if key not in seen and key not in skip_labels:
+                parties.append({"name": label, "role_label": label})
+                seen.add(key)
+
+        return parties[:15]  # cap at 15
+
+    def _extract_dates(self, text: str) -> list:
+        """Find dates and associated context (deadlines, effective dates, etc.)."""
+        dates = []
+        seen = set()
+
+        # Written dates: January 1, 2025 or 1st day of January, 2025
+        for m in re.finditer(
+            r"(?:(?:January|February|March|April|May|June|July|August|September|"
+            r"October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}|"
+            r"\d{1,2}(?:st|nd|rd|th)?\s+day\s+of\s+(?:January|February|March|April|"
+            r"May|June|July|August|September|October|November|December),?\s+\d{4})",
+            text,
+        ):
+            date_str = m.group(0).strip()
+            if date_str not in seen:
+                # Get surrounding context for label
+                start = max(0, m.start() - 60)
+                context = text[start : m.start()].strip()
+                dates.append({"date": date_str, "context": context[-60:].strip()})
+                seen.add(date_str)
+
+        # Numeric dates: mm/dd/yyyy or yyyy-mm-dd
+        for m in re.finditer(r"\b(\d{1,2}/\d{1,2}/\d{4}|\d{4}-\d{2}-\d{2})\b", text):
+            date_str = m.group(0)
+            if date_str not in seen:
+                start = max(0, m.start() - 60)
+                context = text[start : m.start()].strip()
+                dates.append({"date": date_str, "context": context[-60:].strip()})
+                seen.add(date_str)
+
+        # Duration references
+        for m in re.finditer(
+            r"\b(\d+)\s+(day|business day|calendar day|month|year)s?\b",
+            text,
+            re.IGNORECASE,
+        ):
+            label = f"{m.group(1)} {m.group(2)}(s)"
+            if label not in seen:
+                start = max(0, m.start() - 60)
+                context = text[start : m.start()].strip()
+                dates.append({"date": label, "context": context[-60:].strip()})
+                seen.add(label)
+                if len(dates) > 20:
+                    break
+
+        return dates[:20]
+
+    def _extract_financials(self, text: str) -> list:
+        """Find dollar amounts, percentages, caps, and financial thresholds."""
+        financials = []
+        seen = set()
+
+        # Dollar amounts: $1,000,000 or $1M or USD 500,000
+        for m in re.finditer(
+            r"(?:USD\s*)?\$\s*[\d,]+(?:\.\d{2})?(?:\s*(?:million|billion|M|B|K))?|"
+            r"(?:USD|US\$)\s*[\d,]+(?:\.\d{2})?",
+            text,
+        ):
+            amount = m.group(0).strip()
+            if amount not in seen:
+                start = max(0, m.start() - 80)
+                end = min(len(text), m.end() + 80)
+                context = text[start:end].strip()
+                financials.append({"amount": amount, "context": context})
+                seen.add(amount)
+
+        # Percentages
+        for m in re.finditer(r"\b(\d+(?:\.\d+)?)\s*%\b", text):
+            amount = m.group(0).strip()
+            if amount not in seen:
+                start = max(0, m.start() - 80)
+                end = min(len(text), m.end() + 80)
+                context = text[start:end].strip()
+                financials.append({"amount": amount, "context": context})
+                seen.add(amount)
+
+        return financials[:20]
+
+    def _extract_sections(self, text: str) -> list:
+        """Return list of section headings found in the document."""
+        sections = []
+        seen = set()
+
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            header = self._detect_header(stripped)
+            if header and header not in seen:
+                sections.append(header)
+                seen.add(header)
+
+        return sections
+
+    def _detect_header(self, stripped: str) -> Optional[str]:
+        if not stripped:
+            return None
+
+        md = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if md:
+            return md.group(2).strip()
+
+        num = re.match(
+            r"^(?:Section|SECTION|Article|ARTICLE|Clause|CLAUSE)?\s*"
+            r"(\d{1,3}(?:\.\d{1,3}){0,3}\.?|[IVXivx]{1,6}\.?)\s+"
+            r"(.{3,60})$",
+            stripped,
+        )
+        if num:
+            title = num.group(2).strip()
+            # Reject lines that look like numbered list items (start with lowercase or are sentences)
+            if title and title[0].isupper() and not title.endswith("."):
+                return f"Section {num.group(1).rstrip('.')} — {title}"
+
+        if (
+            stripped.isupper()
+            and 4 <= len(stripped) <= 60
+            and not any(c.isdigit() for c in stripped[:3])
+        ):
+            return stripped.title()
+
+        if stripped.endswith(":") and len(stripped) <= 60 and stripped[0].isupper():
+            return stripped.rstrip(":")
+
+        return None
+
+    def _extract_risk_signals(self, text: str) -> list:
+        """Flag phrases commonly associated with risky or one-sided contract terms."""
+        risk_patterns = [
+            (r"\bindemnif(?:y|ication|ied)\b", "Indemnification clause present"),
+            (r"\bnon-compete\b|\bnon compete\b|\bnoncompete\b", "Non-compete clause present"),
+            (r"\bliquidated damages\b", "Liquidated damages clause present"),
+            (r"\bwaiver of (?:jury|class action|class)\b", "Jury/class action waiver"),
+            (r"\bbinding arbitration\b|\bmandatory arbitration\b", "Mandatory arbitration clause"),
+            (r"\bperpetual\b", "Perpetual obligation or license grant"),
+            (r"\birrevocable\b", "Irrevocable right or waiver"),
+            (r"\bunlimited liability\b", "Unlimited liability exposure"),
+            (r"\bno limitation on liability\b|\bliability is not limited\b", "No liability cap"),
+            (r"\bauto(?:matic(?:ally)?)?[\s-]renew", "Auto-renewal provision"),
+            (r"\bwithout cause\b|\bat will\b", "At-will or without-cause termination"),
+            (r"\bexclusive\b", "Exclusivity provision"),
+            (r"\bin perpetuity\b", "Perpetual term"),
+            (r"\bsole (?:and absolute )?discretion\b", "Sole discretion clause"),
+            (r"\brepresent(?:ation)?s? and warrant(?:ies|y)\b", "Representations and warranties"),
+            (r"\bforce majeure\b", "Force majeure clause"),
+            (r"\bassignment\b", "Assignment provision"),
+            (r"\bconfidential(?:ity)?\b", "Confidentiality obligation"),
+            (r"\bgoverning law\b|\bchoice of law\b", "Choice of law provision"),
+            (r"\bcure period\b|\bnotice and cure\b", "Cure period in termination"),
+        ]
+
+        found = []
+        seen = set()
+        text_lower = text.lower()
+
+        for pattern, label in risk_patterns:
+            if re.search(pattern, text_lower):
+                if label not in seen:
+                    # Find first occurrence for context
+                    m = re.search(pattern, text_lower)
+                    if m:
+                        start = max(0, m.start() - 50)
+                        end = min(len(text), m.end() + 100)
+                        excerpt = text[start:end].strip()
+                        found.append({"signal": label, "excerpt": excerpt})
+                        seen.add(label)
+
+        return found

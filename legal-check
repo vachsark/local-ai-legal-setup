@@ -9,6 +9,13 @@
 #   legal-check -m plain clause.txt         # Use plain-language translator
 #   legal-check -c                          # Check clipboard contents
 #   legal-check -c -m email                 # Check clipboard with specific model
+#   legal-check -d contract.pdf "What is the indemnification cap?"
+#   legal-check -s contract.pdf             # Summarize a document
+#   legal-check -i contract.pdf             # Interactive Q&A session
+#   legal-check -b contracts/               # Batch risk scan of a folder
+#   legal-check -b contracts/ -o report.md  # Batch scan, write report to file
+#   legal-check -b contracts/ --batch-mode privilege  # Privilege review mode
+#   legal-check -b contracts/ --batch-focus "indemnification,auto-renewal"
 
 set -euo pipefail
 
@@ -27,34 +34,79 @@ USE_CLIPBOARD=false
 VERBOSE=false
 RAW_OUTPUT=false
 INPUT_FILE=""
+DOC_MODE=false
+SUMMARY_MODE=false
+INTERACTIVE_MODE=false
+BATCH_MODE=false
+RULES_MODE=false
+JURISDICTION=""
+RULES_JSON_MODE=false
+BATCH_SCAN_MODE="risk"
+BATCH_OUTPUT=""
+BATCH_FOCUS=""
+BATCH_DIR=""
+DOC_QUESTION=""
 
 usage() {
     cat <<'USAGE'
-legal-check — Grammar & style checker for legal writing
+legal-check — Grammar & style checker and document Q&A for legal writing
 
 USAGE:
   legal-check [OPTIONS] [FILE]
   cat document.txt | legal-check [OPTIONS]
+  legal-check -d FILE "question"
+  legal-check -s FILE
+  legal-check -i FILE
+  legal-check -b DIRECTORY [--batch-mode MODE] [-o OUTPUT]
 
 OPTIONS:
   -m MODE    Model to use (default: grammar)
-               grammar   Full 7-point legal writing review (qwen3:14b)
+               grammar   Full 7-point legal writing review (qwen3.5:9b)
                email     Quick email polish (gemma3:12b, fastest)
-               brief     Court filing proofreader (qwen3:14b)
-               contract  Contract precision & ambiguity (qwen3:14b)
+               brief     Court filing proofreader (qwen3.5:9b)
+               contract  Contract precision & ambiguity (qwen3.5:9b)
                plain     Plain-language rewrite (gemma3:12b)
+               rules     Court filing format checker (no AI model — instant)
+  --jurisdiction KEY  Jurisdiction for rules mode (e.g., 9th-circuit, cal-superior)
+  --list-jurisdictions  List all supported court jurisdictions and exit
   -c         Read from clipboard (xclip/xsel/wl-paste)
   -r         Raw output (no formatting/colors)
   -v         Verbose (show model, token count, timing)
+  -d FILE    Document Q&A mode — ask a question about a document
+             Supports PDF (requires pdftotext) and text files
+  -s FILE    Summarize a document
+  --document FILE    Long form of -d
+  --summarize FILE   Long form of -s
+  -i FILE    Interactive Q&A session about a document
+  --interactive FILE Long form of -i
+  -b DIR     Batch scan a folder of contracts (.txt, .pdf, .docx)
+  --batch DIR        Long form of -b
+  --batch-mode MODE  Batch mode: risk (default), privilege, terms
+  --batch-focus TERMS  Comma-separated focus terms for risk mode
+                       e.g. "indemnification,auto-renewal,termination"
+  -o FILE    Output file for batch report (default: print to stdout)
   -h         Show this help
 
 EXAMPLES:
-  legal-check brief.txt                    # Full grammar review
-  legal-check -m email email.txt           # Quick email check
-  legal-check -m brief motion.docx.txt     # Brief review
-  cat clause.txt | legal-check -m contract # Contract precision check
-  legal-check -c -m email                  # Check clipboard email
-  legal-check -m plain lease-section.txt   # Plain-language rewrite
+  legal-check brief.txt                               # Full grammar review
+  legal-check -m email email.txt                      # Quick email check
+  legal-check -m brief motion.docx.txt                # Brief review
+  cat clause.txt | legal-check -m contract            # Contract precision check
+  legal-check -c -m email                             # Check clipboard email
+  legal-check -m plain lease-section.txt              # Plain-language rewrite
+  legal-check -d contract.pdf "What is the indemnification cap?"
+  legal-check -d deposition.txt "Summarize the key admissions"
+  legal-check -s contract.pdf                        # Summarize a document
+  legal-check -i contract.pdf                        # Interactive session
+  legal-check -b contracts/                          # Batch risk scan
+  legal-check -b contracts/ -o report.md             # Save report to file
+  legal-check -b discovery/ --batch-mode privilege   # Privilege review
+  legal-check -b contracts/ --batch-mode terms       # Key terms extraction
+  legal-check -b contracts/ --batch-focus "indemnification,auto-renewal"
+  legal-check -m rules --jurisdiction 9th-circuit brief.txt   # Filing format check
+  legal-check -m rules --jurisdiction cal-superior motion.txt
+  legal-check -m rules --jurisdiction sdny memo.txt
+  legal-check --list-jurisdictions                            # See all courts
 
 SETUP:
   cd /path/to/local-ai-legal-setup
@@ -66,16 +118,121 @@ USAGE
     exit 0
 }
 
-# Parse arguments
+# ── PDF / text extraction ──────────────────────────────────────────────────────
+
+extract_text() {
+    local file="$1"
+    local ext="${file##*.}"
+
+    if [[ "${ext,,}" == "pdf" ]]; then
+        if ! command -v pdftotext &>/dev/null; then
+            echo "Error: pdftotext not found. Install poppler-utils:" >&2
+            echo "  Arch/Manjaro:  sudo pacman -S poppler" >&2
+            echo "  Ubuntu/Debian: sudo apt install poppler-utils" >&2
+            echo "  macOS:         brew install poppler" >&2
+            echo "  Windows:       choco install poppler" >&2
+            exit 1
+        fi
+        pdftotext "$file" - 2>/dev/null
+    else
+        cat "$file"
+    fi
+}
+
+# Strip think blocks (Qwen3/Qwen3.5 models)
+# Handles both XML format (<think>...</think>) and text format (Thinking...\n...done thinking.)
+strip_think() {
+    sed '/<think>/,/<\/think>/d' |
+    sed '/^Thinking\.\.\.$/,/^\.\.\.done thinking\.$/d' |
+    sed '/^Thinking Process:$/,/^\.\.\.done thinking\.$/d' |
+    sed '/^[[:space:]]*$/d'
+}
+
+# Build a document-aware prompt and run it
+run_doc_query() {
+    local doc_text="$1"
+    local question="$2"
+    local model="$3"
+
+    # Truncate if too long (~12000 chars ≈ ~3000 tokens of context headroom)
+    local truncated=false
+    local max_chars=12000
+    if [[ ${#doc_text} -gt $max_chars ]]; then
+        doc_text="${doc_text:0:$max_chars}"
+        truncated=true
+    fi
+
+    # Use Modelfile.document-qa system prompt if it exists next to this script
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local sys_prompt
+    if [[ -f "$script_dir/Modelfile.document-qa" ]]; then
+        # Extract SYSTEM block from Modelfile
+        sys_prompt=$(awk '/^SYSTEM """/{p=1; next} /^"""/{p=0} p' "$script_dir/Modelfile.document-qa")
+    else
+        sys_prompt="You are a precise legal document analyst. You answer questions about the document provided. Be concise and accurate. Quote relevant text when helpful. Do not speculate beyond what the document says. If the answer is not in the document, say so clearly."
+    fi
+
+    if [[ "$RAW_OUTPUT" != true ]]; then
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  legal-check [document] — $INPUT_FILE"
+        if [[ "$truncated" == true ]]; then
+            echo "  ⚠  Document truncated to first ~12,000 chars (file is large)"
+        fi
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+    fi
+
+    local full_prompt
+    # Append /no_think to suppress chain-of-thought output on Qwen3/Qwen3.5 base models.
+    # Custom Modelfiles inject this via TEMPLATE; base models need it inline.
+    full_prompt="$(printf '%s\n\n---DOCUMENT---\n%s\n---END DOCUMENT---\n\n%s /no_think' \
+        "$sys_prompt" "$doc_text" "$question")"
+
+    local start_time
+    start_time=$(date +%s%N)
+
+    local response
+    response=$(ollama run "$model" <<< "$full_prompt" 2>/dev/null)
+    response=$(echo "$response" | strip_think)
+
+    local end_time elapsed_ms
+    end_time=$(date +%s%N)
+    elapsed_ms=$(( (end_time - start_time) / 1000000 ))
+
+    echo "$response"
+
+    if [[ "$VERBOSE" == true && "$RAW_OUTPUT" != true ]]; then
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        local elapsed_sec
+        elapsed_sec=$(awk "BEGIN {printf \"%.1f\", $elapsed_ms / 1000}")
+        echo "  Model: $model | Time: ${elapsed_sec}s"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    fi
+}
+
+# ── Parse arguments ────────────────────────────────────────────────────────────
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -m|--model)
             MODEL_KEY="$2"
-            if [[ -z "${MODELS[$MODEL_KEY]+x}" ]]; then
-                echo "Error: Unknown model '$MODEL_KEY'. Options: ${!MODELS[*]}" >&2
+            if [[ "$MODEL_KEY" == "rules" ]]; then
+                RULES_MODE=true
+            elif [[ -z "${MODELS[$MODEL_KEY]+x}" ]]; then
+                echo "Error: Unknown model '$MODEL_KEY'. Options: rules ${!MODELS[*]}" >&2
                 exit 1
             fi
             shift 2
+            ;;
+        --jurisdiction)
+            JURISDICTION="$2"
+            shift 2
+            ;;
+        --list-jurisdictions)
+            SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            exec python3 "$SCRIPT_DIR/tools/court-rules-checker.py" --list-jurisdictions
             ;;
         -c|--clipboard)
             USE_CLIPBOARD=true
@@ -88,6 +245,41 @@ while [[ $# -gt 0 ]]; do
         -v|--verbose)
             VERBOSE=true
             shift
+            ;;
+        -d|--document)
+            DOC_MODE=true
+            INPUT_FILE="$2"
+            shift 2
+            # Remaining args are the question
+            DOC_QUESTION="$*"
+            break
+            ;;
+        -s|--summarize)
+            SUMMARY_MODE=true
+            INPUT_FILE="$2"
+            shift 2
+            ;;
+        -i|--interactive)
+            INTERACTIVE_MODE=true
+            INPUT_FILE="$2"
+            shift 2
+            ;;
+        -b|--batch)
+            BATCH_MODE=true
+            BATCH_DIR="$2"
+            shift 2
+            ;;
+        --batch-mode)
+            BATCH_SCAN_MODE="$2"
+            shift 2
+            ;;
+        --batch-focus)
+            BATCH_FOCUS="$2"
+            shift 2
+            ;;
+        -o|--output)
+            BATCH_OUTPUT="$2"
+            shift 2
             ;;
         -h|--help)
             usage
@@ -102,6 +294,203 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# ── Batch scan mode ────────────────────────────────────────────────────────────
+
+if [[ "$BATCH_MODE" == true ]]; then
+    if [[ -z "$BATCH_DIR" ]]; then
+        echo "Error: No directory specified for batch mode." >&2
+        echo "Usage: legal-check -b DIRECTORY [--batch-mode risk|privilege|terms] [-o output.md]" >&2
+        exit 1
+    fi
+    if [[ ! -d "$BATCH_DIR" ]]; then
+        echo "Error: Directory not found: $BATCH_DIR" >&2
+        exit 1
+    fi
+
+    # Locate batch-scanner.py relative to this script
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SCANNER="$SCRIPT_DIR/tools/batch-scanner.py"
+
+    if [[ ! -f "$SCANNER" ]]; then
+        echo "Error: batch-scanner.py not found at $SCANNER" >&2
+        exit 1
+    fi
+
+    SCANNER_ARGS=("$BATCH_DIR" "--mode" "$BATCH_SCAN_MODE")
+    if [[ -n "$BATCH_FOCUS" ]]; then
+        SCANNER_ARGS+=("--focus" "$BATCH_FOCUS")
+    fi
+    if [[ -n "$BATCH_OUTPUT" ]]; then
+        SCANNER_ARGS+=("--output" "$BATCH_OUTPUT")
+    fi
+
+    exec python3 "$SCANNER" "${SCANNER_ARGS[@]}"
+fi
+
+# ── Court rules compliance mode ────────────────────────────────────────────────
+
+if [[ "$RULES_MODE" == true ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    CHECKER="$SCRIPT_DIR/tools/court-rules-checker.py"
+
+    if [[ ! -f "$CHECKER" ]]; then
+        echo "Error: court-rules-checker.py not found at $CHECKER" >&2
+        exit 1
+    fi
+
+    if [[ -z "$JURISDICTION" ]]; then
+        echo "Error: --jurisdiction required for rules mode." >&2
+        echo "  Example: legal-check -m rules --jurisdiction 9th-circuit brief.txt" >&2
+        echo "  List all: legal-check --list-jurisdictions" >&2
+        exit 1
+    fi
+
+    CHECKER_ARGS=("--jurisdiction" "$JURISDICTION")
+    if [[ "$RAW_OUTPUT" == true ]]; then
+        CHECKER_ARGS+=("--json")
+    fi
+
+    if [[ -n "$INPUT_FILE" ]]; then
+        if [[ ! -f "$INPUT_FILE" ]]; then
+            echo "Error: File not found: $INPUT_FILE" >&2
+            exit 1
+        fi
+        exec python3 "$CHECKER" "${CHECKER_ARGS[@]}" "$INPUT_FILE"
+    elif [[ ! -t 0 ]]; then
+        # Pipe input — write to temp file so checker can read it
+        TMPFILE=$(mktemp /tmp/legal-check-XXXXXX.txt)
+        trap 'rm -f "$TMPFILE"' EXIT
+        cat > "$TMPFILE"
+        exec python3 "$CHECKER" "${CHECKER_ARGS[@]}" "$TMPFILE"
+    else
+        echo "Error: No input provided. Specify a file or pipe text via stdin." >&2
+        echo "  Example: legal-check -m rules --jurisdiction 9th-circuit brief.txt" >&2
+        exit 1
+    fi
+fi
+
+# ── Document modes ─────────────────────────────────────────────────────────────
+
+if [[ "$DOC_MODE" == true || "$SUMMARY_MODE" == true || "$INTERACTIVE_MODE" == true ]]; then
+    # Validate file
+    if [[ -z "$INPUT_FILE" ]]; then
+        echo "Error: No file specified for document mode." >&2
+        exit 1
+    fi
+    if [[ ! -f "$INPUT_FILE" ]]; then
+        echo "Error: File not found: $INPUT_FILE" >&2
+        exit 1
+    fi
+
+    # Use contract-reviewer for document modes (best at structured analysis)
+    DOC_MODEL="contract-reviewer"
+
+    # Check if model exists; fall back to qwen3.5:9b base model
+    if ! (ollama list 2>/dev/null || true) | grep -q "contract-reviewer"; then
+        if (ollama list 2>/dev/null || true) | grep -q "qwen3.5"; then
+            DOC_MODEL="qwen3.5:9b"
+        elif (ollama list 2>/dev/null || true) | grep -q "gemma3"; then
+            DOC_MODEL="gemma3:12b"
+        else
+            echo "Error: No suitable model found. Run ./build-models.sh or pull a model first." >&2
+            exit 1
+        fi
+    fi
+
+    # Extract document text
+    DOC_TEXT=$(extract_text "$INPUT_FILE")
+
+    if [[ -z "$DOC_TEXT" ]]; then
+        echo "Error: Could not extract text from: $INPUT_FILE" >&2
+        exit 1
+    fi
+
+    if [[ "$DOC_MODE" == true ]]; then
+        # ── -d: single question ──
+        if [[ -z "$DOC_QUESTION" ]]; then
+            echo "Error: No question provided. Usage: legal-check -d file.pdf \"your question\"" >&2
+            exit 1
+        fi
+        run_doc_query "$DOC_TEXT" "$DOC_QUESTION" "$DOC_MODEL"
+
+    elif [[ "$SUMMARY_MODE" == true ]]; then
+        # ── -s: summarize ──
+        SUMMARY_QUESTION="Provide a concise summary of this document. Cover: (1) document type and parties, (2) key obligations for each party, (3) notable risk provisions or unusual terms, (4) important dates or deadlines. Format with clear sections."
+        run_doc_query "$DOC_TEXT" "$SUMMARY_QUESTION" "$DOC_MODEL"
+
+    elif [[ "$INTERACTIVE_MODE" == true ]]; then
+        # ── -i: interactive session ──
+        # Truncate doc text once for the session
+        local_max=12000
+        local_truncated=false
+        if [[ ${#DOC_TEXT} -gt $local_max ]]; then
+            DOC_TEXT="${DOC_TEXT:0:$local_max}"
+            local_truncated=true
+        fi
+
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  legal-check — Interactive Document Session"
+        echo "  Document: $INPUT_FILE"
+        if [[ "$local_truncated" == true ]]; then
+            echo "  ⚠  Document truncated to first ~12,000 chars (file is large)"
+        fi
+        echo ""
+        echo "  Type your questions. Type 'exit' or 'quit' to end."
+        echo "  Type 'summary' for a document overview."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+
+        while true; do
+            # Read question
+            printf "> "
+            IFS= read -r user_input </dev/tty
+
+            # Normalize input
+            trimmed="${user_input#"${user_input%%[![:space:]]*}"}"
+            trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+
+            if [[ -z "$trimmed" ]]; then
+                continue
+            fi
+
+            if [[ "${trimmed,,}" == "exit" || "${trimmed,,}" == "quit" ]]; then
+                echo ""
+                echo "Session ended."
+                break
+            fi
+
+            if [[ "${trimmed,,}" == "summary" ]]; then
+                trimmed="Provide a concise summary of this document covering: document type and parties, key obligations, notable risk provisions, important dates."
+            fi
+
+            echo ""
+
+            # Build script dir again (we're still in same process)
+            script_dir2="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            local_sys_prompt=""
+            if [[ -f "$script_dir2/Modelfile.document-qa" ]]; then
+                local_sys_prompt=$(awk '/^SYSTEM """/{p=1; next} /^"""/{p=0} p' "$script_dir2/Modelfile.document-qa")
+            else
+                local_sys_prompt="You are a precise legal document analyst. You answer questions about the document provided. Be concise and accurate. Quote relevant text when helpful. Do not speculate beyond what the document says. If the answer is not in the document, say so clearly."
+            fi
+
+            full_prompt="$(printf '%s\n\n---DOCUMENT---\n%s\n---END DOCUMENT---\n\n%s /no_think' \
+                "$local_sys_prompt" "$DOC_TEXT" "$trimmed")"
+
+            response=$(ollama run "$DOC_MODEL" <<< "$full_prompt" 2>/dev/null)
+            response=$(echo "$response" | strip_think)
+
+            echo "$response"
+            echo ""
+        done
+    fi
+
+    exit 0
+fi
+
+# ── Standard grammar/style mode (original behavior) ───────────────────────────
 
 MODEL="${MODELS[$MODEL_KEY]}"
 
@@ -174,8 +563,9 @@ RESPONSE=$(ollama run "$MODEL" <<< "$TEXT" 2>/dev/null)
 END_TIME=$(date +%s%N)
 ELAPSED_MS=$(( (END_TIME - START_TIME) / 1000000 ))
 
-# Strip empty think tags from Qwen3 models
-RESPONSE=$(echo "$RESPONSE" | sed '/^<think>$/,/^<\/think>$/d' | sed '/^$/N;/^\n$/d')
+# Strip think blocks from Qwen3/Qwen3.5 models (handles both empty and populated blocks).
+# With /no_think in TEMPLATE, these should not appear — this is a safety fallback.
+RESPONSE=$(echo "$RESPONSE" | strip_think)
 
 echo "$RESPONSE"
 

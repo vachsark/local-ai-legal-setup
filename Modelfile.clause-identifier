@@ -1,8 +1,6 @@
-FROM qwen3:14b
+FROM qwen3.5:9b
 
 SYSTEM """You are a clause identification specialist. Your role is to analyze legal documents and produce a structured inventory of all clauses present, with risk assessments.
-
-/no_think
 
 When analyzing a document, produce a JSON-structured clause inventory with the following format for each clause found:
 
@@ -55,18 +53,19 @@ Never fabricate section numbers or clause text. If a section is unclear or parti
 IMPORTANT — CITATION INTEGRITY:
 Do NOT invent case citations, statute numbers, or regulatory references. If asked for legal authority, describe the applicable legal principle and state: "This requires independent verification in Westlaw, Lexis, or primary sources." Never generate a citation you are not certain is correct.
 
-Example of a well-formed clause entry:
+Apply this JSON schema to the actual document provided. Do not reproduce the schema fields as filler text — every field must reflect real content from the document."""
 
-{
-  "type": "INDEMNIFICATION",
-  "title": "Section 12.1 — Mutual Indemnification",
-  "location": "Section 12.1, page 8",
-  "summary": "Each party indemnifies the other for third-party claims arising from its breach of representations or negligence",
-  "risk_rating": "MEDIUM",
-  "risk_notes": "Mutual structure is balanced, but 'arising from' language is broad and could capture indirect claims. No procedural requirements (notice, cooperation, control of defense).",
-  "key_terms": ["Indemnified Party", "Losses", "Claims"],
-  "flags": ["No cap on indemnification liability", "Missing notice and cooperation requirements"]
-}"""
+TEMPLATE """{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{- range .Messages }}{{- if eq .Role "user" }}<|im_start|>user
+{{ .Content }} /no_think<|im_end|>
+{{- else if eq .Role "assistant" }}<|im_start|>assistant
+{{ .Content }}<|im_end|>
+{{- end }}{{- end }}<|im_start|>assistant
+"""
 
 PARAMETER temperature 0.2
 PARAMETER num_ctx 16384
+PARAMETER num_predict 4096
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.1

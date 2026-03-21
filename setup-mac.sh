@@ -125,17 +125,17 @@ step "3/7: Downloading AI models"
 echo ""
 echo "Pulling 3 base models for legal work:"
 echo "  1. gemma3:12b       (8GB)   — Fast, great for summarization"
-echo "  2. qwen3:14b        (9GB)   — Strong analysis, structured output"
+echo "  2. qwen3.5:9b        (6GB)   — Best instruction following (IFEval 91.5), structured analysis"
 echo "  3. nomic-embed-text (274MB) — Document search embeddings"
 
 # Determine which models to pull based on RAM
 if [[ "$TOTAL_RAM_GB" -ge 32 ]]; then
     echo "  4. mistral-small    (14GB)  — Complex reasoning (you have enough RAM)"
-    models=("gemma3:12b" "qwen3:14b" "mistral-small:24b" "nomic-embed-text")
+    models=("gemma3:12b" "qwen3.5:9b" "mistral-small:24b" "nomic-embed-text")
 else
     echo ""
     warn "Skipping mistral-small (needs 32GB+ RAM for comfortable use)"
-    models=("gemma3:12b" "qwen3:14b" "nomic-embed-text")
+    models=("gemma3:12b" "qwen3.5:9b" "nomic-embed-text")
 fi
 echo ""
 
@@ -273,7 +273,7 @@ echo "  First time: create a local account (stays on your machine)"
 echo ""
 echo "Models available:"
 echo "  gemma3:12b       — Fast daily tasks"
-echo "  qwen3:14b        — Detailed analysis"
+echo "  qwen3.5:9b        — Detailed analysis"
 if [[ "$TOTAL_RAM_GB" -ge 32 ]]; then
 echo "  mistral-small    — Complex reasoning"
 fi

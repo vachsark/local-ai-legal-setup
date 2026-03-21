@@ -173,12 +173,12 @@ step "4/10: Downloading AI models (this takes a while)"
 echo ""
 echo "Pulling 3 models for legal work + embedding model for document search:"
 echo "  1. gemma3:12b       (8GB)   — Fast, great for summarization and drafting"
-echo "  2. qwen3:14b        (9GB)   — Strong instruction following, structured analysis"
+echo "  2. qwen3.5:9b        (6GB)   — Best instruction following (IFEval 91.5), structured analysis"
 echo "  3. mistral-small    (14GB)  — Most capable, best for complex reasoning"
 echo "  4. nomic-embed-text (274MB) — Embedding model for document upload (RAG)"
 echo ""
 
-models=("gemma3:12b" "qwen3:14b" "mistral-small:24b" "nomic-embed-text")
+models=("gemma3:12b" "qwen3.5:9b" "mistral-small:24b" "nomic-embed-text")
 
 for model in "${models[@]}"; do
     if ollama list 2>/dev/null | grep -q "$(echo "$model" | cut -d: -f1)"; then
@@ -195,7 +195,17 @@ step "5/10: Creating legal presets (specialized models)"
 
 info "Building legal-tuned model presets from Modelfiles..."
 
-modelfiles=("contract-reviewer" "depo-summarizer" "memo-drafter" "clause-identifier" "legal-reviewer")
+modelfiles=(
+    "contract-reviewer"
+    "depo-summarizer"
+    "memo-drafter"
+    "clause-identifier"
+    "legal-reviewer"
+    "email-polisher"
+    "brief-reviewer"
+    "contract-language"
+    "plain-language"
+)
 
 for name in "${modelfiles[@]}"; do
     modelfile="$SCRIPT_DIR/Modelfile.$name"
@@ -356,6 +366,24 @@ else
     warn "Try manually: ollama run gemma3:12b"
 fi
 
+# ── Install legal-check CLI ──
+step "10b/10: Installing legal-check CLI"
+
+chmod +x "$SCRIPT_DIR/legal-check"
+
+INSTALL_DIR="$HOME/.local/bin"
+mkdir -p "$INSTALL_DIR"
+
+ln -sf "$SCRIPT_DIR/legal-check" "$INSTALL_DIR/legal-check"
+ok "legal-check installed to $INSTALL_DIR/legal-check"
+
+if ! command -v legal-check &>/dev/null; then
+    warn "$INSTALL_DIR is not in your PATH."
+    echo "  Add this line to your ~/.bashrc or ~/.zshrc:"
+    echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
+    echo "  Then restart your terminal or run: source ~/.bashrc"
+fi
+
 # ── Verify Security ──
 echo ""
 info "Verifying network security..."
@@ -392,15 +420,15 @@ echo "it stays on your machine — no email verification needed)."
 echo ""
 echo "Available models (select from dropdown in chat):"
 echo "  - gemma3:12b      Fast daily work, summaries, drafting"
-echo "  - qwen3:14b       Structured analysis, detailed responses"
+echo "  - qwen3.5:9b       Structured analysis, detailed responses"
 echo "  - mistral-small   Complex reasoning, best quality (slower)"
 echo ""
 echo "Legal presets (specialized system prompts):"
-echo "  - contract-reviewer  Contract analysis (qwen3:14b)"
+echo "  - contract-reviewer  Contract analysis (qwen3.5:9b)"
 echo "  - depo-summarizer    Deposition summaries (gemma3:12b)"
 echo "  - memo-drafter       Legal memo drafting (mistral-small)"
-echo "  - clause-identifier  Structured clause extraction (qwen3:14b)"
-echo "  - legal-reviewer     Writing review and proofreading (qwen3:14b)"
+echo "  - clause-identifier  Structured clause extraction (qwen3.5:9b)"
+echo "  - legal-reviewer     Writing review and proofreading (qwen3.5:9b)"
 echo ""
 echo "Tools (import manually in Open WebUI > Workspace > Tools > +):"
 echo "  - legal-grammar-checker    Grammar/style checking (needs LanguageTool)"
@@ -408,6 +436,9 @@ echo "  - legal-readability-scorer Readability metrics for legal text"
 echo "  - contract-comparator      Side-by-side document comparison"
 echo "  - citation-checker         Scan AI output for citations to verify"
 echo "  - ai-disclaimer            Add ABA-compliant disclaimers to output"
+echo "  - supervision-log          Log attorney reviews for ABA 512 compliance"
+echo "  - compliance-report        Generate monthly compliance reports"
+echo "  - time-tracker             Estimate billable time saved by AI"
 echo "  See tools/ folder and README.md for import instructions."
 echo ""
 echo "Voice-to-text: Click the mic icon in the chat input to dictate."
@@ -417,8 +448,9 @@ echo "Document upload: Create a Knowledge collection in Open WebUI,"
 echo "upload PDFs, then reference them with # in chat. See README.md."
 echo ""
 echo "ABA compliance templates (in templates/ folder):"
-echo "  - client-disclosure.md   Client AI disclosure letter (Rule 1.4)"
-echo "  - firm-ai-policy.md      Firm AI usage policy (Rules 5.1/5.3)"
+echo "  - client-disclosure.md              Client AI disclosure letter (Rule 1.4)"
+echo "  - firm-ai-policy.md                 Firm AI usage policy (Rules 5.1/5.3)"
+echo "  - engagement-letter-ai-addendum.md  Per-matter AI consent addendum"
 echo ""
 echo "See README.md for:"
 echo "  - How to use document upload (RAG)"
@@ -432,3 +464,14 @@ echo ""
 echo -e "${YELLOW}IMPORTANT: These models are not as accurate as GPT-4 or Claude.${NC}"
 echo -e "${YELLOW}Always verify outputs, especially case citations and legal claims.${NC}"
 echo ""
+
+# ── First-run experience ──
+if [[ -f "$SCRIPT_DIR/first-run.sh" ]]; then
+    read -p "Run the quick demo now to see legal-check in action? [Y/n] " demo_confirm
+    if [[ "${demo_confirm:-Y}" =~ ^[Yy]$ ]]; then
+        bash "$SCRIPT_DIR/first-run.sh"
+    else
+        echo ""
+        echo "Run it anytime: bash first-run.sh"
+    fi
+fi

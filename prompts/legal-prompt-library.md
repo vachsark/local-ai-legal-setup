@@ -394,6 +394,216 @@ Tone: Firm but professional. Not threatening.
 
 ---
 
+## Career Development (10 prompts)
+
+_For law students, new associates, and paralegals building their legal careers. Recommended model: **legal-tutor** for interactive guidance, **qwen3.5:9b** for structured answers._
+
+---
+
+### 21. Explain Like I'm a 1L
+
+**Model**: legal-tutor | **Expect**: Plain-language explanation with examples, building to the technical rule
+
+```
+Explain [legal concept] like I'm a 1L who just finished reading about it but doesn't
+fully understand it yet.
+
+Start with the plain-English version of what this rule is actually doing.
+Then introduce the legal terminology and formal elements.
+Give me one concrete real-world example that makes the rule click.
+Finally, flag the most common place where students get this wrong.
+
+Concept: [e.g., "proximate cause", "consideration", "personal jurisdiction", "hearsay"]
+```
+
+---
+
+### 22. What's the Difference?
+
+**Model**: legal-tutor | **Expect**: Side-by-side comparison with distinguishing examples
+
+```
+What's the difference between [A] and [B]? I keep confusing them.
+
+Please:
+1. Explain what each one IS in plain language (one sentence each)
+2. Explain the key distinction — the one thing that separates them
+3. Give me a fact pattern where A applies but not B
+4. Give me a fact pattern where B applies but not A
+5. Give me a fact pattern where it's genuinely ambiguous which one applies,
+   and explain how courts typically resolve that ambiguity
+
+A: [e.g., "assault" vs "battery", "offer" vs "invitation to deal",
+   "res judicata" vs "collateral estoppel", "easement appurtenant" vs "easement in gross"]
+B: [second concept]
+```
+
+---
+
+### 23. Walk Me Through It
+
+**Model**: legal-tutor | **Expect**: Step-by-step procedural walkthrough
+
+```
+Walk me through how to [legal task or procedure] step by step.
+
+Assume I understand the law but have never actually done this before.
+Focus on: what actually happens at each step, what I need to prepare,
+what mistakes are easy to make, and what I should check at the end.
+
+Task: [e.g., "file a motion for summary judgment", "conduct a deposition",
+       "draft an NDA from scratch", "open a client matter file",
+       "record a deed", "admit a document into evidence at trial"]
+```
+
+---
+
+### 24. Interview Prep by Firm Type
+
+**Model**: legal-tutor | **Expect**: Role-specific prep guide with likely questions and smart answers
+
+```
+I have a job interview at [firm type]. What should I prepare?
+
+Tell me:
+1. What this type of employer actually values in candidates (be honest — not generic)
+2. The 5 most likely interview questions for this role, with notes on what a strong
+   answer demonstrates
+3. What I should know about their work before walking in
+4. 3 smart questions I could ask the interviewer that show genuine interest
+5. Common mistakes candidates make in this type of interview
+
+Firm type: [e.g., "BigLaw litigation department", "boutique IP firm",
+            "public defender's office", "in-house at a tech company",
+            "regional mid-size firm doing real estate and business law",
+            "state attorney general's office"]
+Position: [e.g., "2L summer associate", "entry-level paralegal",
+           "first-year associate", "lateral associate"]
+```
+
+---
+
+### 25. Cover Letter Review
+
+**Model**: legal-tutor | **Expect**: Detailed line-by-line feedback with rewritten examples
+
+```
+Review my cover letter for a [position] application and tell me how to improve it.
+
+Be direct — tell me what's weak, what's generic, what's strong, and what's missing.
+For every weak section, show me a rewritten version.
+
+Position: [e.g., "public defender fellowship", "BigLaw summer associate",
+           "in-house counsel at a startup", "judicial clerkship"]
+
+My cover letter:
+[paste cover letter]
+```
+
+---
+
+### 26. First-Year Priorities
+
+**Model**: legal-tutor | **Expect**: Honest, specific guide with career stage-appropriate priorities
+
+```
+What are the most important things to learn in my first year as [role]?
+
+I want honest, practical priorities — not generic advice. Tell me:
+1. The 5 skills that will matter most for my long-term career
+2. What "being reliable" actually means in practice at this stage
+3. The biggest mistakes first-years make that follow them for years
+4. How to get good work and good mentorship
+5. What success looks like at 3 months, 6 months, and 12 months
+
+Role: [e.g., "a BigLaw first-year associate", "a paralegal at a small firm",
+       "a public interest attorney", "a judicial clerk", "a legal aid attorney"]
+Practice area: [e.g., "corporate M&A", "civil litigation", "criminal defense", "general"]
+```
+
+---
+
+### 27. Practice Bar Question Drill
+
+**Model**: legal-tutor | **Expect**: MBE-style question followed by detailed answer explanation
+
+```
+Give me a practice MBE question on [topic] in [subject area].
+After I answer, tell me if I'm right and explain why each answer choice is
+correct or incorrect.
+
+Don't give me the answer until I respond.
+
+Topic: [e.g., "negligence per se", "mailbox rule", "fourth amendment stop and frisk"]
+Subject: [torts / contracts / constitutional law / civil procedure / criminal law /
+          criminal procedure / evidence / real property]
+Difficulty: [1L / bar exam / advanced]
+```
+
+---
+
+### 28. IRAC Practice
+
+**Model**: legal-tutor | **Expect**: Guided issue-spotting with feedback on structure and analysis
+
+```
+Give me a fact pattern to practice IRAC analysis. After I write my answer,
+grade my response on:
+- Issue spotting (did I find all the issues?)
+- Rule accuracy (did I state the rules correctly?)
+- Application quality (did I apply the rule to the facts, or just restate them?)
+- Conclusion (did I reach a defensible conclusion?)
+
+After grading, show me what a strong answer looks like.
+
+Subject area: [torts / contracts / criminal law / constitutional law / property / etc.]
+Difficulty: [1L / law school exam / bar exam]
+```
+
+---
+
+### 29. Ethics Scenario Analysis
+
+**Model**: legal-tutor | **Expect**: Model Rules analysis with concrete next steps
+
+```
+Help me think through this ethics situation.
+
+I want to understand what the Model Rules require, what they permit, and what
+I should actually do. Don't give me a formal opinion — walk me through the
+analysis so I understand the reasoning.
+
+Situation: [describe the ethics situation in detail, e.g.,
+  "My supervising partner asked me to change the date on a memo I drafted,
+   and I'm not sure if that's okay",
+  "I learned that a client is planning to use our work product to commit fraud",
+  "I accidentally received opposing counsel's privileged email"]
+
+My jurisdiction (if relevant): [state or "federal" or "unsure"]
+```
+
+---
+
+### 30. Explain This Ruling
+
+**Model**: legal-tutor | **Expect**: Plain-language explanation with practical implications
+
+```
+Explain what this court ruling means in plain language and what its
+practical implications are.
+
+Paste in a case excerpt, holding, or decision summary below. I want to understand:
+1. What did the court actually decide?
+2. Why did it matter? What was the dispute really about?
+3. What rule does this establish or clarify?
+4. How would I use this in practice — what types of cases does it affect?
+5. Any notable dissent or controversy?
+
+[paste ruling excerpt or holding]
+```
+
+---
+
 ## Usage Tips
 
 - **Upload documents first** — Create a Knowledge collection, upload your files, then reference with `#` in chat
@@ -401,3 +611,4 @@ Tone: Firm but professional. Not threatening.
 - **Verify everything** — These prompts instruct models not to fabricate citations, but always verify independently
 - **Combine prompts** — Use the timeline builder first, then feed the timeline into the issue spotter
 - **Switch models** — Start with gemma3:12b for speed; re-run with mistral-small if quality isn't sufficient
+- **Career prompts** — Use legal-tutor for interactive Socratic sessions; use qwen3.5:9b when you want direct answers fast

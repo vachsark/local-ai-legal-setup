@@ -23,6 +23,7 @@ class Tools:
     async def score_readability(
         self,
         text: str,
+        document_type: str = "auto",
         __event_emitter__=None,
     ) -> str:
         """
@@ -30,6 +31,10 @@ class Tools:
         sentence statistics, and legal-context interpretation.
 
         :param text: The legal text to analyze for readability.
+        :param document_type: Document type for target-band interpretation.
+            Options: "brief" (appellate/court filing), "contract" (transactional),
+            "client_letter" (advisory/demand letter), "consumer" (disclosures,
+            plain-language summaries), "auto" (infer from grade level). Default: "auto".
         :return: Readability metrics with legal-context interpretation.
         """
         import textstat
@@ -81,6 +86,73 @@ class Tools:
         # Legal context interpretation
         avg_grade = round((flesch_grade + gunning_fog + smog) / 3, 1)
 
+        # Document-type target bands
+        # Source: plain-language guidelines, ABA readability research, CFPB consumer disclosure standards
+        target_bands = {
+            "brief": {
+                "ideal_min": 14,
+                "ideal_max": 18,
+                "label": "Court Brief / Motion",
+                "target_note": (
+                    "Target: grade 14-18. Below 14 may appear unsophisticated for appellate work; "
+                    "above 18 risks losing judicial readers. "
+                    "Sentences over 40 words should be broken up."
+                ),
+            },
+            "contract": {
+                "ideal_min": 12,
+                "ideal_max": 16,
+                "label": "Contract / Transactional",
+                "target_note": (
+                    "Target: grade 12-16. Precision matters more than brevity, but "
+                    "sentences over 50 words should be restructured into enumerated lists."
+                ),
+            },
+            "client_letter": {
+                "ideal_min": 10,
+                "ideal_max": 14,
+                "label": "Client Letter / Advisory",
+                "target_note": (
+                    "Target: grade 10-14. Educated non-lawyers should follow this. "
+                    "Above grade 14, consider simplifying for the specific recipient."
+                ),
+            },
+            "consumer": {
+                "ideal_min": 6,
+                "ideal_max": 10,
+                "label": "Consumer Disclosure / Plain Language",
+                "target_note": (
+                    "Target: grade 6-10 (CFPB plain-language standard: 8th grade or below for consumer disclosures). "
+                    "Above grade 10, rewrite for a general audience."
+                ),
+            },
+        }
+
+        # Auto-detect document type from grade level if not specified
+        effective_type = document_type.lower().strip()
+        if effective_type == "auto" or effective_type not in target_bands:
+            if avg_grade >= 16:
+                effective_type = "brief"
+            elif avg_grade >= 12:
+                effective_type = "contract"
+            elif avg_grade >= 9:
+                effective_type = "client_letter"
+            else:
+                effective_type = "consumer"
+
+        band = target_bands.get(effective_type)
+        if band:
+            if avg_grade < band["ideal_min"]:
+                target_status = f"BELOW TARGET — may appear unsophisticated for a {band['label']} (target: grade {band['ideal_min']}-{band['ideal_max']})"
+            elif avg_grade > band["ideal_max"]:
+                target_status = f"ABOVE TARGET — too dense for a {band['label']} (target: grade {band['ideal_min']}-{band['ideal_max']})"
+            else:
+                target_status = f"ON TARGET for a {band['label']} (target: grade {band['ideal_min']}-{band['ideal_max']})"
+            target_note = band["target_note"]
+        else:
+            target_status = None
+            target_note = None
+
         if avg_grade >= 18:
             interpretation = "Academic/Scholarly"
             recommendation = (
@@ -129,6 +201,15 @@ class Tools:
                 }
             )
 
+        legal_interpretation = {
+            "category": interpretation,
+            "recommendation": recommendation,
+        }
+        if target_status:
+            legal_interpretation["document_type_target"] = target_status
+        if target_note:
+            legal_interpretation["document_type_guidance"] = target_note
+
         output = {
             "readability_scores": {
                 "flesch_reading_ease": flesch_ease,
@@ -148,10 +229,7 @@ class Tools:
                 "estimated_passive_voice_instances": passive_estimate,
                 "passive_voice_pct_of_sentences": passive_pct,
             },
-            "legal_interpretation": {
-                "category": interpretation,
-                "recommendation": recommendation,
-            },
+            "legal_interpretation": legal_interpretation,
             "reference_bands": {
                 "grade_18_plus": "Academic / Law review",
                 "grade_16_17": "Briefs / Judicial opinions",

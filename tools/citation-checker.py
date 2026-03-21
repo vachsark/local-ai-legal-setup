@@ -75,15 +75,33 @@ class Tools:
         ]
 
         # Non-existent reporters (red flags)
+        # These are series beyond the current highest series for each reporter.
+        # LLMs frequently hallucinate "next series" reporters.
         self.fake_reporters = [
+            # Federal reporters — F. is only at 4th
             r"F\.5th",
             r"F\.6th",
+            # Supreme Court reporters — no 2d series
             r"U\.S\.R\.",
             r"S\.Ct\.2d",
+            # Federal Supplement — no 4th series
             r"F\.Supp\.4th",
+            # Regional reporters — each currently stops at 3d (NE, NW) or 2d (SE)
             r"N\.E\.4th",
             r"S\.E\.3d",
             r"N\.W\.3d",
+            r"S\.W\.4th",
+            r"P\.4th",
+            r"A\.4th",
+            r"So\.\s*4th",
+            # New York state reporters — N.Y.S. is at 3d, no 4th series
+            r"N\.Y\.S\.4d",
+            r"N\.Y\.S\.4th",
+            # California App reporters — Cal.App. is at 4th (5th and above do not exist)
+            r"Cal\.App\.\s*5th",
+            r"Cal\.App\.\s*6th",
+            # Cal.Rptr. is at 3d — no 4th series
+            r"Cal\.Rptr\.\s*4th",
         ]
 
         # Bluebook signals
@@ -197,8 +215,9 @@ class Tools:
         """Find volume/reporter/page citations."""
         citations = []
 
-        # Build reporter alternation
-        all_reporters = self.federal_reporters + self.state_reporters
+        # Build reporter alternation — include fake reporters so they get matched
+        # and then flagged, rather than passing silently through undetected.
+        all_reporters = self.federal_reporters + self.state_reporters + self.fake_reporters
         reporter_pattern = "|".join(all_reporters)
 
         # Match: number reporter number (optional parenthetical)
@@ -425,3 +444,47 @@ class Tools:
                 seen.add(key)
                 unique.append(c)
         return unique
+
+    def validate_output(self, output_json: str) -> dict:
+        """
+        Validate that the citation checker output conforms to the expected schema.
+        Returns {"valid": bool, "errors": list[str]}.
+        Useful for catching model output drift when this tool is used with an LLM pipeline.
+        """
+        import json
+
+        errors = []
+        try:
+            data = json.loads(output_json)
+        except json.JSONDecodeError as e:
+            return {"valid": False, "errors": [f"Invalid JSON: {e}"]}
+
+        # Top-level keys
+        for key in ("citations_found", "summary"):
+            if key not in data:
+                errors.append(f"Missing top-level key: '{key}'")
+
+        # summary sub-keys
+        summary = data.get("summary", {})
+        for key in ("total", "high_risk_count", "recommendation"):
+            if key not in summary:
+                errors.append(f"Missing summary key: '{key}'")
+
+        if "total" in summary and not isinstance(summary["total"], int):
+            errors.append("summary.total must be an integer")
+
+        if "high_risk_count" in summary and not isinstance(
+            summary["high_risk_count"], int
+        ):
+            errors.append("summary.high_risk_count must be an integer")
+
+        # citations_found entries
+        citations = data.get("citations_found", [])
+        for i, c in enumerate(citations):
+            for key in ("text", "type", "position", "red_flags"):
+                if key not in c:
+                    errors.append(f"Citation [{i}] missing key: '{key}'")
+            if "red_flags" in c and not isinstance(c["red_flags"], list):
+                errors.append(f"Citation [{i}].red_flags must be a list")
+
+        return {"valid": len(errors) == 0, "errors": errors}

@@ -1,0 +1,107 @@
+UNITED STATES DISTRICT COURT
+SOUTHERN DISTRICT OF NEW YORK
+
+MERIDIAN PARTNERS LLC,
+    Plaintiff,
+Case No. 1:24-cv-08901-LTS
+
+v.
+
+NORTHSTAR CAPITAL GROUP INC.,
+    Defendant.
+
+
+DEFENDANT'S MEMORANDUM OF LAW IN SUPPORT OF
+MOTION TO DISMISS PURSUANT TO RULE 12(b)(6)
+
+
+INTRODUCTION
+
+Defendant Northstar Capital Group Inc. ("Northstar") moves to dismiss the Complaint filed
+by Plaintiff Meridian Partners LLC ("Meridian") for failure to state a claim upon which
+relief can be granted. Fed. R. Civ. P. 12(b)(6). Meridian's breach of contract claim fails
+as a matter of law because the parties' agreement expressly allocated the very risk Meridian
+now seeks to shift to Northstar. Its tortious interference claim fares no better — it rests
+on wholly conclusory allegations that cannot survive Iqbal/Twombly scrutiny.
+
+
+BACKGROUND
+
+Meridian and Northstar entered into a joint venture agreement in February 2023 to develop
+commercial real estate in lower Manhattan. The agreement contained an express force majeure
+clause that excused Northstar's performance obligations "in the event of any circumstances
+beyond Northstar's reasonable control, including but not limited to market disruptions,
+regulatory changes, or adverse economic conditions." Compl. ¶ 12.
+
+In October 2023, Northstar invoked the force majeure clause following a sharp increase in
+construction costs attributable to supply chain disruptions and revised zoning requirements
+by the New York City Department of Buildings. Meridian contends this invocation was
+improper and sues for breach of contract and tortious interference with Meridian's
+anticipated business relationships with third-party contractors.
+
+Northstar now moves to dismiss.
+
+
+ARGUMENT
+
+I. MERIDIAN'S BREACH OF CONTRACT CLAIM FAILS BECAUSE THE FORCE MAJEURE CLAUSE
+   EXPRESSLY COVERS THE CIRCUMSTANCES AT ISSUE.
+
+Under New York law, force majeure clauses are enforced according to their plain terms.
+See Kel Kim Corp. v. Central Markets, Inc., 70 N.Y.2d 900, 902 (1987). A party seeking
+to invoke a force majeure clause need only demonstrate that the triggering conditions
+specified in the contract have occurred. See id.
+
+Here, the force majeure clause expressly covers "market disruptions" and "regulatory
+changes." The supply chain disruptions and the zoning changes from the Department of
+Buildings are precisely the types of events the parties contemplated and allocated when
+they negotiated the agreement. Meridian cannot now seek to undo that allocation simply
+because the clause operates in Northstar's favor.
+
+Meridian's contrary argument — that force majeure clauses require the party invoking them
+to demonstrate complete impossibility — is flatly inconsistent with New York law. See 407
+East 61st Garage, Inc. v. Savoy Fifth Ave. Corp., 23 N.Y.2d 275, 281 (1968) (force
+majeure clause governs when it "specifically covers" the event at issue).
+
+II. MERIDIAN'S TORTIOUS INTERFERENCE CLAIM IS FATALLY CONCLUSORY.
+
+To state a claim for tortious interference with prospective economic advantage under New
+York law, a plaintiff must allege: (1) a business relationship with a third party;
+(2) the defendant's knowledge of that relationship; (3) intentional interference with the
+relationship by improper means; and (4) damages. See Carvel Corp. v. Noonan, 3 N.Y.3d
+182, 189-90 (2004).
+
+Meridian's tortious interference claim fails at the threshold because the Complaint does
+not identify a single specific business relationship that Northstar allegedly disrupted.
+Instead, Meridian refers only to vague "anticipated relationships with third-party
+contractors." Compl. ¶ 28. This is precisely the type of conclusory allegation that the
+Supreme Court rejected in Ashcroft v. Iqbal, 556 U.S. 662, 678 (2009) and Bell Atl.
+Corp. v. Twombly, 550 U.S. 544, 570 (2007). A complaint must plead "enough facts to
+state a claim to relief that is plausible on its face." Twombly, 550 U.S. at 570. The
+Complaint here falls well short.
+
+Moreover, Meridian fails to allege that Northstar acted by "improper means" — a distinct
+element under New York law that requires conduct that is independently tortious or in
+violation of a recognized duty. See Carvel Corp., 3 N.Y.3d at 190. Northstar simply
+exercised its contractual rights. That is not tortious interference.
+
+
+CONCLUSION
+
+For the foregoing reasons, Defendant Northstar Capital Group Inc. respectfully requests
+that the Court dismiss the Complaint in its entirety with prejudice.
+
+Dated: March 1, 2025
+New York, New York
+
+Respectfully submitted,
+
+/s/ Michael D. Torres
+MICHAEL D. TORRES
+Torres & Webb LLP
+One Liberty Plaza, 34th Floor
+New York, NY 10006
+(212) 555-0200
+mtorres@torreswebb.com
+
+Counsel for Defendant Northstar Capital Group Inc.

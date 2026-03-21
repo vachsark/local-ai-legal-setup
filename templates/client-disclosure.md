@@ -43,15 +43,36 @@ AI tools are **never** used as a substitute for:
 - **Court filings** — No document is filed with any court without independent attorney review and verification of all citations, legal standards, and factual claims
 - **Client counseling** — Legal advice is always delivered by a licensed attorney exercising professional judgment
 
-### Data Handling
+### Data Handling — Local Processing
 
-[Select the applicable option and delete the other]
+[FIRM NAME] uses **local-only AI tools** that run entirely on our own hardware. This means:
 
-**Option A — Local/On-Premise AI:**
-Our AI tools run entirely on [FIRM NAME]'s local hardware. No client data is transmitted to external servers, cloud services, or third-party AI providers. Your information remains within our firm's IT infrastructure at all times.
+- **No data leaves our machines.** Your documents, facts, and communications are never transmitted to external servers, cloud services, or third-party AI providers.
+- **No internet connection is used** during AI processing. All inference runs locally after the one-time model download during setup.
+- **No model training on your data.** Local models are static — your matter information is never used to update or retrain any AI model.
+- **All services bind to localhost only** (127.0.0.1), making them inaccessible from outside the firm's devices even on a local network.
 
-**Option B — Cloud-Based AI:**
-Certain AI tools transmit data to [PROVIDER NAME]'s servers for processing. [PROVIDER NAME] [does / does not] retain data after processing and [does / does not] use client data to train AI models. We have reviewed [PROVIDER NAME]'s data handling policies and [have executed a data processing agreement / are satisfied that adequate protections exist] to protect client confidentiality.
+The AI models used in your matter are:
+
+| Model                              | Primary Use                                      |
+| ---------------------------------- | ------------------------------------------------ |
+| gemma3:12b                         | Document summarization, drafting, plain language |
+| qwen3.5:9b                         | Structured analysis, checklists, comparisons     |
+| mistral-small:24b                  | Complex reasoning, detailed memoranda            |
+| [Add any legal-preset models used] | [Task description]                               |
+
+If you have questions about data handling, you may ask to review the firm's technical setup documentation at any time.
+
+### Supervision Process
+
+Every AI-generated output used in your matter is reviewed by a licensed attorney before use. Specifically:
+
+1. **Attorney reviews** the AI output for accuracy, completeness, and legal soundness
+2. **The review is logged** in the firm's supervision system, recording the outcome (approved, modified, or rejected) and any attorney notes
+3. **Only reviewed output** is incorporated into work product
+4. **Monthly compliance reports** are generated and retained as firm records
+
+This supervision process is designed to satisfy the requirements of ABA Formal Opinion 512 (July 2024), which requires attorneys to understand and supervise AI outputs. The supervision log is maintained locally and is never transmitted externally.
 
 ### Attorney Oversight
 
@@ -79,21 +100,21 @@ You have the right to:
 
 By signing below, I acknowledge that I have read and understand [FIRM NAME]'s disclosure regarding the use of AI tools in legal services. I consent to the use of AI tools as described above in connection with my matter.
 
-**Client Signature:** **************\_\_\_\_**************
+**Client Signature:** ******\*\*******\_\_\_\_******\*\*******
 
 **Printed Name:** [CLIENT NAME]
 
-**Date:** **************\_\_\_\_**************
+**Date:** ******\*\*******\_\_\_\_******\*\*******
 
 **Matter/File No.:** [MATTER NUMBER]
 
 ---
 
-**Attorney Signature:** **************\_\_\_\_**************
+**Attorney Signature:** ******\*\*******\_\_\_\_******\*\*******
 
 **Printed Name:** [ATTORNEY NAME]
 
-**Date:** **************\_\_\_\_**************
+**Date:** ******\*\*******\_\_\_\_******\*\*******
 
 ---
 

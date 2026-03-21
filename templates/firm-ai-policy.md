@@ -62,9 +62,57 @@ AI tools shall **never** be used to:
 
 ---
 
-## 4. Verification Requirements
+## 4. Supervision Logging (ABA Formal Opinion 512)
 
-### 4.1 Citation Verification
+### 4.1 Logging Requirement
+
+ABA Formal Opinion 512 (July 2024) makes clear that supervisory obligations under Rules 5.1 and 5.3 extend fully to AI-generated work product. To make compliance demonstrable, [FIRM NAME] requires that attorney review of AI outputs be logged in the firm's supervision system.
+
+**All attorneys and supervised staff must:**
+
+1. Use the **Supervision Log** tool (Open WebUI → Tools → Supervision Log) after reviewing any AI-generated output
+2. Record the review outcome: `approved`, `modified`, or `rejected`
+3. Add notes when output is modified (summarize what was changed) or rejected (reason for rejection)
+4. Never bypass the logging step — undocumented review is the same as no review for compliance purposes
+
+### 4.2 What Gets Logged
+
+The supervision log captures the following **per interaction**:
+
+| Field          | What Is Stored                      | What Is NOT Stored        |
+| -------------- | ----------------------------------- | ------------------------- |
+| Timestamp      | Date/time of review (UTC)           | —                         |
+| Reviewer       | Attorney username                   | Passwords or credentials  |
+| Model          | Model name (e.g. gemma3:12b)        | Model weights or config   |
+| Input summary  | First 200 characters of prompt      | Full prompt text          |
+| Output summary | First 200 characters of AI response | Full AI output            |
+| Review status  | approved / modified / rejected      | —                         |
+| Notes          | Attorney notes on changes/rejection | Client-identifying detail |
+
+> **Privacy design**: The log stores only truncated summaries — never full document contents. Client data does not enter the database. This design complies with Rule 1.6 while preserving a complete supervision audit trail.
+
+### 4.3 Database Location and Retention
+
+- **Location**: `~/.legal-ai/supervision.db` (local SQLite, never transmitted)
+- **Access**: Firm IT controls access via filesystem permissions
+- **Retention**: Retain at minimum 3 years post-matter-close, consistent with file retention obligations
+- **Backup**: Include `~/.legal-ai/` in firm backup procedures
+
+### 4.4 Compliance Reports
+
+Monthly compliance reports can be generated at any time using the **Compliance Report** tool (Open WebUI → Tools → Compliance Report):
+
+- `monthly_summary(year, month)` — full monthly breakdown for firm records
+- `compliance_gap_report()` — flags any entries with invalid status
+- `export_markdown(period)` — full log export for PDF conversion
+
+Reports should be retained with the monthly file review and made available to supervising partners on request.
+
+---
+
+## 5. Verification Requirements
+
+### 5.1 Citation Verification
 
 **Every legal citation** in AI-generated text must be independently verified before use. This includes:
 
@@ -75,15 +123,15 @@ AI tools shall **never** be used to:
 
 Verification must be performed in authoritative legal databases (Westlaw, Lexis, official government sources), not by asking the AI to confirm its own citations.
 
-### 4.2 Legal Standard Verification
+### 5.2 Legal Standard Verification
 
 AI descriptions of legal tests, standards, and elements must be verified against authoritative sources. AI tools may conflate elements from different tests or misstate standards.
 
-### 4.3 Factual Claims
+### 5.3 Factual Claims
 
 All factual assertions in AI-generated text must be verified against the case file and source documents. AI tools may fabricate or misattribute facts.
 
-### 4.4 Documentation
+### 5.4 Documentation
 
 Attorneys should maintain records of:
 
@@ -159,7 +207,20 @@ Before using AI tools, classify the data:
 - Non-lawyer personnel must complete the same training (Section 5.1)
 - Their AI-assisted work product requires the same attorney review as any other work product
 
-### 7.3 Vendors and Contractors
+### 7.3 Supervision Log Review Cadence
+
+To ensure the supervision logging system is functioning and compliance is current:
+
+| Cadence       | Action                                                                   | Responsible         |
+| ------------- | ------------------------------------------------------------------------ | ------------------- |
+| **Weekly**    | Spot-check supervision log entries — verify review statuses look correct | Practice group lead |
+| **Monthly**   | Run `monthly_summary()` report; retain in firm records                   | Supervising partner |
+| **Quarterly** | Run `compliance_gap_report()`; remediate any anomalies                   | Policy owner        |
+| **Annually**  | Full log audit as part of annual policy review (Section 9)               | Ethics counsel      |
+
+Monthly reports should be generated within the first 5 business days of the following month.
+
+### 7.4 Vendors and Contractors
 
 - Third-party vendors who use AI in firm work must disclose their AI usage
 - Vendor AI tools must meet the same confidentiality standards as firm tools
@@ -214,13 +275,13 @@ This policy will be reviewed and updated at least annually, or sooner when:
 
 I have read, understand, and agree to comply with [FIRM NAME]'s AI Usage Policy.
 
-**Signature:** **************\_\_\_\_**************
+**Signature:** **\*\***\*\***\*\***\_\_\_\_**\*\***\*\***\*\***
 
-**Printed Name:** **************\_\_\_\_**************
+**Printed Name:** **\*\***\*\***\*\***\_\_\_\_**\*\***\*\***\*\***
 
-**Title:** **************\_\_\_\_**************
+**Title:** **\*\***\*\***\*\***\_\_\_\_**\*\***\*\***\*\***
 
-**Date:** **************\_\_\_\_**************
+**Date:** **\*\***\*\***\*\***\_\_\_\_**\*\***\*\***\*\***
 
 ---
 

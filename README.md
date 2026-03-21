@@ -1,9 +1,15 @@
 # Local AI for Legal Work
 
-Private, local AI that runs entirely on your machine. After initial setup (which downloads models from the internet), all AI inference is local — no API calls, no cloud services.
+AI assistance for legal work — without sending client data to the cloud.
 
-**Hardware**: AMD RX 9070 XT (16GB VRAM) on Linux, or Apple Silicon Mac (M1/M2/M3/M4, 16GB+ RAM)
+Every query runs entirely on your own hardware. After a one-time model download, there are no API calls, no cloud services, no subscription fees, and nothing ever leaves your machine. Client confidentiality is protected by design.
+
+**What you get**: A ChatGPT-style chat interface in your browser + a `legal-check` command-line tool + 9 specialized legal AI presets + ABA compliance templates and a supervision logging system.
+
+**Designed for**: Solo attorneys and small firms on Linux (AMD GPU) or macOS (Apple Silicon). Windows also supported.
+
 **Stack**: Ollama (model server) + Open WebUI (chat interface) + `legal-check` CLI
+**Hardware**: AMD RX 9070 XT (16GB VRAM) on Linux, or Apple Silicon Mac (M1/M2/M3/M4, 16GB+ RAM)
 
 ---
 
@@ -64,9 +70,11 @@ Use this for most work. It's fast and handles the bread-and-butter tasks well:
 - Reformatting and organizing notes
 - Explaining legal concepts in plain language (for clients)
 
-### qwen3:14b — The Analyst
+### qwen3.5:9b — The Analyst
 
-**Speed**: ~40 tokens/second | **Best for**: Structured analysis
+**Speed**: ~55 tokens/second | **Best for**: Structured analysis, instruction-following
+
+qwen3.5:9b replaces qwen3:14b as the default analyst model. It scores higher on instruction-following benchmarks (IFEval 91.5) while using ~33% less VRAM (~6GB vs ~9GB). The legal presets disable its chain-of-thought mode (`/no_think` in TEMPLATE) so the full output budget goes to the answer, not internal reasoning steps.
 
 Better than gemma3 at following complex instructions and producing structured output:
 
@@ -303,13 +311,211 @@ Sample firm AI usage policy per ABA Rules 5.1/5.3 (Supervisory Responsibilities)
 - Supervisory chain and incident reporting procedures
 - Annual review schedule with checklist
 
-Both templates are designed to be customized — replace bracketed fields with firm-specific information and have ethics counsel review before adoption.
+### templates/engagement-letter-ai-addendum.md
+
+A standalone addendum to include with engagement letters when AI tools will be used in the matter:
+
+- Specific disclosure of which tools are used and for which tasks (checkbox list)
+- Separate sections for local-only vs. cloud AI with appropriate consent language
+- Client opt-out rights and billing disclosure options
+- Attorney supervision process description
+- Signature block for client and attorney
+- Designed to be incorporated by reference into any standard engagement letter
+
+Three templates, one system. The policy covers the firm, the disclosure covers general clients, and the addendum is attached per-matter when AI is used.
+
+All templates are designed to be customized — replace bracketed fields with firm-specific information and have ethics counsel review before adoption.
+
+---
+
+## Career Development
+
+Tools and resources for law students, new associates, and paralegals starting their legal careers. Everything runs locally — no subscriptions, no accounts, perfect for students who can't afford commercial tools.
+
+### The legal-tutor Model
+
+A specialized Ollama model preset tuned for teaching legal concepts:
+
+```bash
+ollama create legal-tutor -f Modelfile.legal-tutor
+```
+
+**What makes it different from the standard models**: Uses the Socratic method — asks guiding questions before giving answers, explains concepts in plain English before introducing legal terms, and never fabricates case citations. Set as default in Open WebUI when using the career tools.
+
+**Based on**: qwen3.5:9b with a tuned system prompt. Temperature 0.4 (slightly higher than the analytical presets — more conversational, appropriate for teaching).
+
+### tools/bar-prep.py — Bar Exam Prep Assistant
+
+Five tools for bar exam preparation:
+
+| Method                                | What It Does                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| `practice_question(topic, subject)`   | Generate MBE-style multiple choice questions with answer explanations    |
+| `spot_issues(fact_pattern)`           | Identify all legal issues in a fact pattern using IRAC structure         |
+| `rule_statement(topic, jurisdiction)` | Produce a memorizable rule statement with elements, exceptions, triggers |
+| `mnemonic(topic)`                     | Generate acronyms, stories, pattern cues, and one-liners for any rule    |
+| `grade_essay(essay, topic)`           | Grade a practice bar essay on IRAC, rule accuracy, and analysis quality  |
+
+Covers all MBE subjects (torts, contracts, civil procedure, constitutional law, criminal law, criminal procedure, evidence, real property) and MEE subjects.
+
+**Import**: Open WebUI → Workspace → Tools → + → paste `tools/bar-prep.py`
+
+### tools/legal-research-trainer.py — Research Skills Trainer
+
+Four tools teaching legal research methodology:
+
+| Method                                       | What It Does                                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `research_strategy(question, jurisdiction)`  | Build a step-by-step research plan: secondary sources → primary → search terms → verification |
+| `bluebook_citation(source, type)`            | Generate correct Bluebook citations with format rules explained by element                    |
+| `shepardizing_guide(concept)`                | Explain how to verify case status (Shepard's signals, KeyCite, negative treatment)            |
+| `source_hierarchy(jurisdiction, issue_type)` | Map binding vs. persuasive authority for any court and issue type                             |
+
+**Import**: Open WebUI → Workspace → Tools → + → paste `tools/legal-research-trainer.py`
+
+**Note**: Teaches methodology, not access. The tool cannot connect to Westlaw, Lexis, or any database.
+
+### tools/mentor-qa.py — Virtual Legal Mentor
+
+Five tools covering the practical knowledge firms assume you already have:
+
+| Method                                  | What It Does                                                                        |
+| --------------------------------------- | ----------------------------------------------------------------------------------- |
+| `billing_guidance(task)`                | How to record time, write descriptions, handle write-offs, and comply with Rule 1.5 |
+| `client_communication(situation, type)` | Templates and norms for emails, letters, call summaries, voicemail scripts          |
+| `professional_development(area)`        | First-year priorities, CLE guidance, firm relationships, career paths               |
+| `ethics_scenario(scenario)`             | Model Rules analysis with concrete next steps and ethics hotline guidance           |
+| `courtroom_basics(proceeding_type)`     | What to expect at hearings, depositions, trial, and 8 other proceeding types        |
+
+Configurable by career stage (1L intern, new associate, paralegal, 2nd year) and practice type (litigation, transactional, public interest).
+
+**Import**: Open WebUI → Workspace → Tools → + → paste `tools/mentor-qa.py`
+
+### templates/new-associate-guide.md
+
+A comprehensive 10-section guide for attorneys starting at a law firm:
+
+- **First Day/Week/Month checklist** — 25+ actionable items before you're 30 days in
+- **Working with partners** — how to receive assignments, deliver work, handle feedback
+- **Billing practices** — time entry, descriptions, write-offs, ethics of billing
+- **Client file management** — DMS organization, naming conventions, confidentiality
+- **Research workflow** — the research funnel, search strategies, knowing when you're done
+- **Writing standards** — memo structure, writing rules, common mistakes
+- **Common mistakes** — missed deadlines, over-reliance on AI, billing errors, and 6 others
+- **Professional development plan** — 90-day, 6-month, and 1-year milestones + CLE planning
+- **Ethics quick reference** — conflicts, confidentiality, candor, Rule 5.2, trust accounts
+- **When to ask for help** — who to ask, how to ask, and what always warrants an escalation
+
+### Career Prompts
+
+10 new prompts added to `prompts/legal-prompt-library.md` in the **Career Development** section:
+
+| Prompt                      | Use Case                                        |
+| --------------------------- | ----------------------------------------------- |
+| Explain Like I'm a 1L       | Plain-language breakdowns of any legal concept  |
+| What's the Difference?      | Side-by-side comparison of confusable doctrines |
+| Walk Me Through It          | Step-by-step procedural walkthroughs            |
+| Interview Prep by Firm Type | Role-specific prep for 8 employer types         |
+| Cover Letter Review         | Line-by-line feedback with rewritten examples   |
+| First-Year Priorities       | Honest guide for any career stage               |
+| Practice Bar Question Drill | Interactive MBE-style question with explanation |
+| IRAC Practice               | Graded essay practice with model answer         |
+| Ethics Scenario Analysis    | Model Rules analysis with next steps            |
+| Explain This Ruling         | Case breakdown with practical implications      |
+
+### tools/bar-exam-simulator.py — Full Bar Exam Simulation
+
+Four tools for the complete bar exam preparation pipeline (MBE, MEE, and MPT):
+
+| Method                                                    | What It Does                                                                                                                                              |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mbe_practice(subject, count)`                            | Generate `count` MBE-style questions with 4 answer choices, full answer key, and why-wrong analysis for each distractor                                   |
+| `mee_practice(subject)`                                   | Full MEE essay question with issue-spotting checklist, IRAC outline, and 500-700 word model answer at passing standard                                    |
+| `mpt_practice(task_type)`                                 | Complete MPT simulation — task memo, client file, library (simulated cases/statutes), and model answer with scoring guide                                 |
+| `study_schedule(exam_date, subjects_weak, hours_per_day)` | Personalized day-by-day study plan from today to exam date; front-loads weak subjects, includes practice test days, rest days, and a final week structure |
+
+Covers all 7 MBE subjects plus all 15 MEE subjects. MPT task types: `memo`, `brief`, `letter`, `discovery-plan`, `negotiation`.
+
+**Configurable via Valves**: `exam_jurisdiction` (default `UBE`), `show_answer` (default on), `difficulty` (`beginner` / `bar` / `expert`).
+
+**Import**: Open WebUI → Workspace → Tools → + → paste `tools/bar-exam-simulator.py`
+
+**Note**: Barbri costs $4,000. Themis costs $1,800. This is $0. Verify all rules against official NCBE materials and current bar prep resources — AI training data has a cutoff date.
+
+### tools/job-prep.py — Job Search and Interview Preparation
+
+Four tools covering the full job search pipeline for new law graduates:
+
+| Method                                          | What It Does                                                                                                                                                                              |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cover_letter(firm_type, position, experience)` | Draft a cover letter tailored to the employer type, with coaching notes on what works and a checklist of what to personalize                                                              |
+| `interview_prep(firm_type, round)`              | Full interview coaching: what they're really evaluating, 8 likely questions with strong-answer structure, 5 questions to ask them, logistics, and honest advice about the unwritten rules |
+| `writing_sample_review(sample)`                 | Review a writing sample for job applications — first impression, legal analysis quality, writing mechanics, suitability, and overall verdict with a before/after revision                 |
+| `salary_negotiation(market, city)`              | Market context, what's negotiable, what's not, and word-for-word scripts for the counteroffer conversation, asking about non-salary items, and handling "no"                              |
+
+Firm types: `biglaw`, `midsize`, `small-firm`, `government`, `public-interest`, `in-house`. Interview rounds: `screening`, `callback`, `partner-lunch`, `writing-sample`.
+
+**Import**: Open WebUI → Workspace → Tools → + → paste `tools/job-prep.py`
+
+### tools/first-year-survival.py — What Law School Doesn't Teach
+
+Four tools for practical first-year survival:
+
+| Method                           | What It Does                                                                                                                                                                     |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `billing_guide(task)`            | How to bill a specific task: weak/acceptable/strong time entry examples, time estimates, what the partner expects as a deliverable, write-off risk, and a concrete walkthrough   |
+| `email_drafting(scenario)`       | Draft a professional email for hard scenarios (bad news, extension request, mistake disclosure, opposing counsel) — full draft + coaching notes + a shorter alternative version  |
+| `research_methodology(question)` | Given a legal research question, build a complete strategy: issue decomposition, secondary-first approach, specific search terms, saturation signal, and how to present findings |
+| `mistake_recovery(situation)`    | What to do in the next 60 minutes after a professional mistake — who to call, what to say, scripts for the conversation, ethics layer, and honest career assessment              |
+
+Common tasks for billing: `research`, `drafting`, `review`, `client-call`, `court-appearance`, `deposition`, `email`.
+Email scenarios: `status-update`, `extension-request`, `client-intake`, `opposing-counsel`, `partner-update`, `court-filing`, `mistake`. Free-form scenarios also work.
+
+**Import**: Open WebUI → Workspace → Tools → + → paste `tools/first-year-survival.py`
+
+### templates/new-associate-checklist.md
+
+A 90-day checklist for your first three months at a law firm — the practical items the orientation doesn't cover:
+
+- **Before you start**: offer letter review, bar admission status, firm research, wardrobe
+- **Week 1**: Admin infrastructure (DMS, billing, docketing), billing guidelines, people to meet
+- **Weeks 2-4**: Taking assignments (the 6 questions to ask before you start), habits to build now
+- **Month 2**: First real work milestones, billing self-audit, research methodology check
+- **Month 3**: Independence milestones, 90-day self-assessment questions
+- **Ongoing**: Communication habits, work product standards, professional judgment, handling mistakes
+- Quick reference table: who to ask for what
+- CLE quick reference: requirements and free/low-cost options
+
+### prompts/transition-prompts.md
+
+10 curated prompts for the bar-to-practice transition:
+
+| Prompt                           | Use Case                                                              |
+| -------------------------------- | --------------------------------------------------------------------- |
+| 10-Week Bar Study Plan           | Personalized schedule by exam date, hours/day, and weak subjects      |
+| Explain an MBE Topic             | Plain-language breakdown + 5 practice questions with full answer keys |
+| Callback Interview Prep          | Role-specific coaching + likely questions + unwritten rules           |
+| Recovering from a Mistake        | Immediate action plan + scripts + honest career assessment            |
+| Billing Time Entry Review        | Paste your week's entries for feedback + corrected examples           |
+| Professional Email Draft         | Send-ready draft for hard scenarios + coaching notes                  |
+| Research Strategy                | Complete methodology from issue decomposition to presenting findings  |
+| What Does This Mean in Practice? | How a doctrine or procedure actually works, step by step              |
+| First-Year Priorities by Role    | Honest, specific guide for your practice area and firm type           |
+| Ethics Situation Walkthrough     | Model Rules analysis + concrete next steps + escalation guidance      |
+
+### Design Principles
+
+- **Zero cost**: Everything runs locally. Students without Westlaw access or bar prep subscriptions can use this.
+- **Honest about limits**: Every tool explicitly instructs the LLM not to fabricate citations and flags when professional advice is needed.
+- **Career-stage aware**: The mentor-qa Valves let you configure experience level so responses are appropriate for a 1L intern vs. a third-year associate.
+- **Socratic by default**: The legal-tutor model guides reasoning rather than just delivering answers — the method that produces long-term understanding, not just memorization.
+- **Empathetic, not clinical**: The bar exam and first year of practice are genuinely hard. The tools are direct and practical — no cheerleading, but also no condescension. Mistakes are normalized; recovery is the focus.
 
 ---
 
 ## Prompt Library
 
-A library of 20 curated prompt templates is included in `prompts/legal-prompt-library.md`, organized by task type:
+A library of 30 curated prompt templates is included in `prompts/legal-prompt-library.md`, organized by task type:
 
 | Category               | Prompts | Recommended Model                 |
 | ---------------------- | ------- | --------------------------------- |
@@ -319,6 +525,7 @@ A library of 20 curated prompt templates is included in `prompts/legal-prompt-li
 | Clause Analysis        | 3       | contract-reviewer / mistral-small |
 | Writing Review         | 3       | legal-reviewer / gemma3:12b       |
 | General                | 3       | mistral-small / gemma3:12b        |
+| Career Development     | 10      | legal-tutor / qwen3.5:9b          |
 
 Each prompt includes the template text (copy-paste ready), which model/preset to use, and what to expect in the output. Open `prompts/legal-prompt-library.md` for the full library.
 
@@ -340,7 +547,7 @@ For high-stakes analysis where accuracy matters more than privacy constraints, y
 | Tier            | Model             | Cost      | Use Case                                |
 | --------------- | ----------------- | --------- | --------------------------------------- |
 | Fast (local)    | gemma3:12b        | Free      | Summaries, drafting, reformatting       |
-| Careful (local) | qwen3:14b         | Free      | Contracts, structured analysis          |
+| Careful (local) | qwen3.5:9b        | Free      | Contracts, structured analysis          |
 | Heavy (local)   | mistral-small:24b | Free      | Complex reasoning, memos                |
 | Quality (cloud) | Claude Sonnet     | ~$3/MTok  | High-stakes analysis, nuanced reasoning |
 | Best (cloud)    | Claude Opus       | ~$15/MTok | Critical work product, final review     |
@@ -470,7 +677,7 @@ Standard text-based PDFs work immediately. Scanned PDFs (images of paper) need O
 
 The setup script creates 5 specialized models that appear in the Open WebUI dropdown alongside the base models. Each has a tuned system prompt for a specific legal task.
 
-### contract-reviewer (based on qwen3:14b)
+### contract-reviewer (based on qwen3.5:9b)
 
 **Use for**: Reviewing contracts, clauses, and agreements
 
@@ -488,7 +695,7 @@ Organizes summaries by topic (not chronologically), includes page:line reference
 
 Uses IRAC structure (Issue, Rule, Application, Conclusion) and standard memo format. Slower but produces the most thorough analysis. Best for final work product.
 
-### clause-identifier (based on qwen3:14b)
+### clause-identifier (based on qwen3.5:9b)
 
 **Use for**: Structured clause extraction and risk assessment
 
@@ -496,7 +703,7 @@ Produces a JSON-formatted inventory of every clause in a contract, with type cla
 
 Best used with uploaded contracts — it will identify and categorize every clause, flag risks, and call out what's missing. See the [Demo: Clause Identification](#demo-clause-identification) section below.
 
-### legal-reviewer (based on qwen3:14b)
+### legal-reviewer (based on qwen3.5:9b)
 
 **Use for**: Legal writing review and proofreading
 
@@ -545,20 +752,20 @@ legal-check -c -m email                 # Clipboard with specific mode
 
 | Mode       | Model Used        | Speed  | Best For                          |
 | ---------- | ----------------- | ------ | --------------------------------- |
-| `grammar`  | legal-reviewer    | ~40t/s | Full 7-point legal writing review |
+| `grammar`  | legal-reviewer    | ~55t/s | Full 7-point legal writing review |
 | `email`    | email-polisher    | ~50t/s | Quick email tone and grammar      |
-| `brief`    | brief-reviewer    | ~40t/s | Court filing proofreader          |
-| `contract` | contract-language | ~40t/s | Contract precision and ambiguity  |
+| `brief`    | brief-reviewer    | ~55t/s | Court filing proofreader          |
+| `contract` | contract-language | ~55t/s | Contract precision and ambiguity  |
 | `plain`    | plain-language    | ~50t/s | Legalese to plain English rewrite |
 
 ### Grammar Checker Models
 
 Five specialized grammar/style models are built from Ollama Modelfiles during setup:
 
-- **legal-reviewer** (qwen3:14b) — Full 7-point checklist: grammar, legal vocabulary preservation, defined terms, citation flagging, style, tone, readability
+- **legal-reviewer** (qwen3.5:9b) — Full 7-point checklist: grammar, legal vocabulary preservation, defined terms, citation flagging, style, tone, readability
 - **email-polisher** (gemma3:12b) — Fast email check: tone, grammar, privilege risks, binding language warnings
-- **brief-reviewer** (qwen3:14b) — Court filing proofreader: Bluebook citations, argument structure, formality
-- **contract-language** (qwen3:14b) — Contract precision: shall/may/must usage, defined terms, ambiguity detection
+- **brief-reviewer** (qwen3.5:9b) — Court filing proofreader: Bluebook citations, argument structure, formality
+- **contract-language** (qwen3.5:9b) — Contract precision: shall/may/must usage, defined terms, ambiguity detection
 - **plain-language** (gemma3:12b) — Rewrites legalese into clear, readable English
 
 To rebuild models manually:
@@ -1118,6 +1325,250 @@ netstat -an | findstr "11434 3000 8081"
 ### Air-Gap After Setup
 
 After the initial model download, you can disconnect from the internet entirely. Everything still works. For maximum security, block all outbound traffic after setup.
+
+---
+
+## Compliance & Ethics (ABA Formal Opinion 512)
+
+### What ABA 512 Requires
+
+ABA Formal Opinion 512 (July 2024) maps the existing Model Rules of Professional Conduct to AI use. For supervision specifically, it establishes that:
+
+- **Rules 5.1 and 5.3** require attorneys and firms to supervise AI-generated work product with the same rigor as work by associates and paralegals
+- Supervision is not optional — attorneys are responsible for AI output they use in matters
+- The obligation is **demonstrable**: if a bar complaint arises, you need records showing review occurred
+- Mere "I reviewed it mentally" is insufficient — structured documentation creates the defensible record
+
+The challenge: local AI tools are fast and conversational, which encourages treating them like a search engine rather than a supervised assistant. ABA 512 says that approach is ethically risky.
+
+### How the Supervision Log Works
+
+This setup includes two Open WebUI tools that make ABA 512 compliance automatic and auditable:
+
+**`tools/supervision-log.py`** — Log each review as it happens
+
+After reviewing an AI output, trigger the tool and record your outcome:
+
+```
+log_review(review_status="approved")
+log_review(review_status="modified", notes="Updated the indemnification cap — AI drafted $100K, changed to unlimited per client's standard")
+log_review(review_status="rejected", notes="Fabricated case citation, discarded entirely")
+```
+
+Each entry writes to `~/.legal-ai/supervision.db` — a local SQLite database. What gets stored:
+
+- Timestamp, reviewer name, model used
+- First 200 characters of input prompt (never the full document)
+- First 200 characters of AI response (never the full response)
+- Review status and attorney notes
+
+Full document contents are **never logged** — this preserves client confidentiality (Rule 1.6) while creating a complete supervision audit trail.
+
+**`tools/compliance-report.py`** — Generate records on demand
+
+```
+monthly_summary(year=2026, month=3)   → Full monthly compliance report for firm records
+compliance_gap_report()               → Scan for any anomalous entries
+export_markdown(period="quarter")     → Full log export for PDF conversion
+```
+
+### Installing the Tools in Open WebUI
+
+1. Open **http://localhost:3000** → Admin Panel → Tools
+2. Click **+** (Add Tool)
+3. Paste the contents of `tools/supervision-log.py` → Save
+4. Repeat for `tools/compliance-report.py`
+5. Enable both tools in your workspace settings
+
+Once installed, the tools appear in the toolbar during any chat session.
+
+### How This Satisfies ABA 512
+
+| ABA 512 Requirement                                | How This Setup Addresses It                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Attorneys must supervise AI output (Rules 5.1/5.3) | `log_review()` creates a record per interaction                                |
+| Supervision must be demonstrable                   | SQLite database with timestamped entries, exportable as PDF                    |
+| Confidentiality must be maintained (Rule 1.6)      | Only 200-char summaries stored; full content never logged                      |
+| Competence: understand AI capabilities (Rule 1.1)  | README documents model limitations, hallucination risks                        |
+| Communication: disclose AI use (Rule 1.4)          | `templates/client-disclosure.md` updated with supervision process              |
+| Supervisory policies (Rules 5.1/5.3)               | `templates/firm-ai-policy.md` includes logging requirements and review cadence |
+
+### Generating Compliance Reports
+
+Monthly reports should be generated within the first 5 business days of each month and retained with firm records. From Open WebUI:
+
+```
+compliance_report.monthly_summary(year=2026, month=3)
+```
+
+Or from the CLI, if you want to inspect the database directly:
+
+```bash
+sqlite3 ~/.legal-ai/supervision.db \
+  "SELECT review_status, COUNT(*) FROM supervision_log
+   WHERE timestamp >= '2026-03-01' AND timestamp < '2026-04-01'
+   GROUP BY review_status;"
+```
+
+For PDF export: use the `export_markdown()` tool, copy the output into Pandoc or Typora, and export as PDF. Retain per your firm's document retention policy (minimum 3 years post-matter-close recommended).
+
+---
+
+## For Law Students
+
+Law school AI tools typically cost $25–$40/month (Quimbee, Westlaw student plans, etc.). This runs entirely on your laptop with no subscription, no usage caps, and nothing sent to any server. Once models are downloaded, it works offline.
+
+> **Disclaimer**: This is a study aid, not a substitute for reading cases. Brief the cases. Read the statutes. Use AI to check your understanding, practice applying rules, and improve your writing — not to skip the work. The model will tell you it can fabricate case citations. Believe it.
+
+---
+
+### What's Available for Students
+
+Four tools are included — import them into Open WebUI following the [Tools import instructions](#tools-import-manually) above. One Modelfile creates a Socratic tutor preset.
+
+#### case-briefer (tools/case-briefer.py)
+
+Three functions for the core law school skill of working with cases:
+
+| Function                        | What it does                                                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brief_case(case_text)`         | Generates a FIRAC brief (Facts, Issue, Rule, Application, Conclusion) from pasted case text. Identifies the holding, obiter dicta, concurrence/dissent summaries, and the exam angle. |
+| `compare_cases(case1, case2)`   | Side-by-side comparison of two cases — distinguishes or reconciles holdings, identifies the key factual or legal difference, and gives exam strategy for when you see both cited.     |
+| `outline_topic(subject, topic)` | Full study outline for any law school topic (e.g., Torts > Negligence): black-letter rule, elements, exceptions, exam triggers, common mistakes, connections to related topics.       |
+
+Every response ends with a Socratic follow-up question.
+
+**Usage**:
+
+```
+Enable the case-briefer tool, then paste a case and ask:
+"Brief this case for me"
+
+Or ask directly:
+"Compare Carlill v. Carbolic Smoke Ball and Lucy v. Zehmer on the objective theory of contract"
+"Give me a study outline for Constitutional Law > Equal Protection"
+```
+
+---
+
+#### exam-prep (tools/exam-prep.py)
+
+Three functions for exam preparation:
+
+| Function                               | What it does                                                                                                                                                         |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `practice_hypo(subject, difficulty)`   | Generates a law school exam-style hypothetical (easy/medium/hard) with a model IRAC answer. Ends with a question the model answer doesn't resolve.                   |
+| `outline_builder(subject, topic_list)` | Builds a full-course outline or a targeted outline from your topic list. Covers rules, elements, exceptions, exam triggers, and common student mistakes.             |
+| `flashcard_set(subject, topic, count)` | Generates up to 50 flashcard Q&A pairs — 40% recall, 35% application (mini fact patterns), 25% policy. Designed to build pattern recognition, not rote memorization. |
+
+**Usage**:
+
+```
+Enable the exam-prep tool, then:
+
+"Generate a hard Contracts hypo"
+"Build a study outline for Criminal Law covering Homicide, Theft, and Inchoate Offenses"
+"Make 25 flashcards for Evidence > Hearsay"
+```
+
+Difficulty levels for practice_hypo:
+
+- `easy` — single issue, clean facts (good for 1L baseline)
+- `medium` — 2–3 issues, some ambiguous facts (standard exam level)
+- `hard` — 3–5 issues, red herrings, majority/minority splits (advanced)
+
+---
+
+#### writing-coach (tools/writing-coach.py)
+
+Three functions targeting the skill that matters most for legal careers:
+
+| Function                                 | What it does                                                                                                                                                                                         |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `review_memo(memo_text)`                 | Full IRAC structure review: grades each section (Issue/Rule/Application/Conclusion), quotes specific sentences that need revision, identifies conclusory application, gives three prioritized fixes. |
+| `improve_paragraph(paragraph, doc_type)` | Rewrites a paragraph for the specified document type (memo, brief, motion, contract, email) with inline explanations for every change — teaches the principle, not just the fix.                     |
+| `citation_quiz(difficulty)`              | Generates 6 Bluebook citation problems with an answer key explaining the rule behind each format, and the policy reason the convention exists.                                                       |
+
+**Usage**:
+
+```
+Enable the writing-coach tool, then:
+
+"Review this memo: [paste your memo]"
+"Improve this paragraph for a brief: [paste paragraph]"
+"Give me an intermediate Bluebook quiz"
+```
+
+Document types for improve_paragraph: `memo`, `brief`, `motion`, `contract`, `email`, `letter`, `note`
+
+Citation quiz difficulty: `basic` (cases, statutes, law review articles), `intermediate` (state courts, id./supra, signals), `advanced` (string citations, subsequent history, international sources)
+
+---
+
+#### law-student preset (Modelfile.law-student)
+
+A Socratic tutor based on qwen3.5:9b. Build it with:
+
+```bash
+ollama create law-student -f Modelfile.law-student
+```
+
+It then appears in the Open WebUI model dropdown as `law-student`.
+
+**What makes it different from the base model**:
+
+- **Always ends with a question** — every explanation is followed by a Socratic follow-up that requires you to apply what you just learned
+- **Rule → Exception → Exception to the Exception** — teaches doctrine in the structure professors and bar examiners use
+- **Exam connections** — after every explanation, flags how the concept appears on a law school exam
+- **Mistake alerts** — explicitly flags what most students get wrong ("Most students miss that...")
+- **Restatement/UCC awareness** — notes when majority rule differs from Restatement or UCC position
+- **Strict citation policy** — never fabricates case names; uses "In a leading case, the court held that..." instead
+
+**Usage** (select `law-student` from the model dropdown):
+
+```
+Explain the elements of negligence
+What's the difference between assault and battery in criminal law?
+I think I understand consideration — test me on it
+Walk me through the IRAC structure for this Contracts problem: [paste hypo]
+Review my analysis of this case and tell me what I'm missing
+```
+
+---
+
+### Recommended Study Workflow
+
+**Briefing a new case**:
+
+1. Read the case (don't skip this)
+2. Paste it into case-briefer: "Brief this case"
+3. Compare your brief to the AI output — where did you miss issues?
+4. Answer the Socratic question the tool generates
+
+**Preparing for exams**:
+
+1. `outline_builder` — generate or verify your outline for each subject
+2. `flashcard_set` — generate application cards, not just recall cards
+3. `practice_hypo(subject, "hard")` — work through the hypo before reading the model answer
+4. Compare your answer to the model answer element by element
+
+**Improving your writing**:
+
+1. Write your memo/brief draft without AI assistance
+2. `review_memo` — read the feedback carefully
+3. Pick the #1 priority fix and rewrite that section
+4. `improve_paragraph` on your weakest paragraph — read the inline explanations
+
+**The Socratic follow-up questions matter**. Every tool ends with one. If you skip them, you're using this as an answer machine, which won't help your grade.
+
+---
+
+### What AI Cannot Do for Law Students
+
+- **Read cases for you** — you need the case in your head for class discussion and exams
+- **Verify legal rules** — these models have training cutoffs and can misstate standards; verify against your casebook, professor's slides, or primary sources
+- **Replace office hours** — if your professor's approach differs from the AI's framing, your professor is right
+- **Generate citable authority** — never use an AI-generated case citation in any paper, memo, or filing without verifying it in Westlaw/Lexis
 
 ---
 

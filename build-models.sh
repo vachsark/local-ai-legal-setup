@@ -13,10 +13,16 @@ GRAMMAR_MODELS=(
     "plain-language"
 )
 
-echo "Building legal grammar checker models..."
+STUDENT_MODELS=(
+    "law-student"
+)
+
+ALL_MODELS=("${GRAMMAR_MODELS[@]}" "${STUDENT_MODELS[@]}")
+
+echo "Building legal AI models..."
 echo ""
 
-for model in "${GRAMMAR_MODELS[@]}"; do
+for model in "${ALL_MODELS[@]}"; do
     modelfile="Modelfile.${model}"
     if [[ ! -f "$modelfile" ]]; then
         echo "  SKIP  $model — $modelfile not found"
@@ -37,9 +43,16 @@ for model in "${GRAMMAR_MODELS[@]}"; do
 done
 
 echo ""
-echo "Done. Available grammar models:"
+echo "Done. Available models:"
+echo ""
+echo "Grammar / style checker models:"
 ollama list 2>/dev/null | grep -E "(legal-reviewer|email-polisher|brief-reviewer|contract-language|plain-language)" || echo "  (none found — check for errors above)"
+echo ""
+echo "Law student models:"
+ollama list 2>/dev/null | grep -E "(law-student)" || echo "  (none found — check for errors above)"
 echo ""
 echo "Usage: legal-check -m email your-email.txt"
 echo "       cat brief.txt | legal-check -m brief"
 echo "       legal-check -c  # clipboard"
+echo ""
+echo "Law student usage: select 'law-student' from the Open WebUI model dropdown"

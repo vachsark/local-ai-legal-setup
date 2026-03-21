@@ -1,0 +1,192 @@
+IN THE UNITED STATES COURT OF APPEALS
+FOR THE NINTH CIRCUIT
+
+No. 24-12345
+
+ACME CORPORATION,
+    Plaintiff-Appellant,
+
+v.
+
+GLOBAL TECH LLC,
+    Defendant-Appellee.
+
+On Appeal from the United States District Court
+for the Central District of California
+No. 2:23-cv-04567-JMK
+
+BRIEF OF PLAINTIFF-APPELLANT ACME CORPORATION
+
+Submitted by:
+JANE A. SMITH
+Smith & Associates LLP
+123 Main Street, Suite 400
+Los Angeles, CA 90001
+(213) 555-0100
+jsmith@smithlaw.com
+
+Counsel for Plaintiff-Appellant
+
+
+TABLE OF CONTENTS
+
+Table of Authorities ......................................... ii
+Jurisdictional Statement ..................................... 1
+Statement of Issues .......................................... 1
+Statement of the Case ........................................ 2
+Summary of Argument .......................................... 4
+Argument ..................................................... 5
+  I. The District Court Erred in Granting Summary Judgment .... 5
+     A. The Standard of Review Is De Novo .................... 5
+     B. Genuine Issues of Material Fact Preclude Summary Judgment .. 6
+  II. Appellant Is Entitled to Injunctive Relief ............. 10
+Conclusion ................................................... 14
+
+
+TABLE OF AUTHORITIES
+
+Cases
+
+Anderson v. Liberty Lobby, Inc., 477 U.S. 242 (1986) ......... 6
+Celotex Corp. v. Catrett, 477 U.S. 317 (1986) ................ 6
+eBay Inc. v. MercExchange, L.L.C., 547 U.S. 388 (2006) ....... 10
+Matsushita Elec. Indus. Co. v. Zenith Radio Corp.,
+  475 U.S. 574 (1986) ......................................... 7
+Winter v. Natural Resources Defense Council, Inc.,
+  555 U.S. 7 (2008) ........................................... 10
+
+Statutes
+
+28 U.S.C. § 1291 .............................................. 1
+28 U.S.C. § 1332 .............................................. 1
+
+
+JURISDICTIONAL STATEMENT
+
+The district court had diversity jurisdiction under 28 U.S.C. § 1332.
+This Court has jurisdiction over this appeal under 28 U.S.C. § 1291. The
+district court entered a final judgment on October 15, 2024. This appeal
+was timely filed on November 12, 2024.
+
+
+STATEMENT OF ISSUES
+
+1. Whether the district court erred in granting summary judgment when
+   genuine issues of material fact existed regarding the breach of contract
+   claim.
+
+2. Whether Appellant is entitled to injunctive relief to prevent ongoing
+   harm to its business operations.
+
+
+STATEMENT OF THE CASE
+
+This appeal arises from a breach of contract dispute between Acme
+Corporation ("Acme" or "Appellant") and Global Tech LLC ("Global Tech" or
+"Appellee"). Acme and Global Tech entered into a software licensing
+agreement in January 2023 (the "Agreement"). Under the Agreement, Global
+Tech was required to provide exclusive access to its proprietary software
+platform and to maintain service availability of at least 99.5%.
+
+Global Tech repeatedly failed to meet its service obligations, resulting
+in significant downtime and financial losses for Acme. Specifically, Global
+Tech's platform experienced seven outages exceeding four hours each between
+March and September 2023, causing Acme to lose substantial business
+opportunities. Acme notified Global Tech of each breach in writing and
+demanded cure within thirty days as required by the Agreement.
+
+Despite multiple notices, Global Tech failed to cure the breaches. Acme
+filed suit in the Central District of California in October 2023, asserting
+claims for breach of contract, breach of the implied covenant of good faith
+and fair dealing, and injunctive relief.
+
+The district court granted Global Tech's motion for summary judgment on
+March 1, 2024, holding that Acme had failed to demonstrate damages with
+sufficient certainty. This appeal followed.
+
+
+SUMMARY OF ARGUMENT
+
+The district court erred in two fundamental respects. First, the court
+improperly weighed competing declarations and resolved factual disputes in
+Appellee's favor, which is the exclusive province of the jury under Ninth
+Circuit law. Second, the court applied the wrong legal standard to Acme's
+request for injunctive relief, ignoring the Winter factors entirely.
+
+Reversal is required because genuine issues of material fact preclude
+summary judgment, and because Acme plainly satisfies the requirements for
+injunctive relief.
+
+
+ARGUMENT
+
+I. THE DISTRICT COURT ERRED IN GRANTING SUMMARY JUDGMENT.
+
+A. The Standard of Review Is De Novo.
+
+This Court reviews a district court's grant of summary judgment de novo.
+See Celotex Corp. v. Catrett, 477 U.S. 317, 322 (1986). Summary judgment
+is appropriate only where "there is no genuine dispute as to any material
+fact and the movant is entitled to judgment as a matter of law." Fed. R.
+Civ. P. 56(a). All inferences must be drawn in favor of the non-moving
+party. See Anderson v. Liberty Lobby, Inc., 477 U.S. 242, 255 (1986);
+Matsushita Elec. Indus. Co. v. Zenith Radio Corp., 475 U.S. 574, 587
+(1986).
+
+B. Genuine Issues of Material Fact Preclude Summary Judgment.
+
+The district court committed reversible error by resolving disputed
+factual questions against Appellant. The core dispute — whether Global
+Tech's outages caused measurable harm to Acme's business — is a question
+of fact for the jury. Acme submitted a detailed expert declaration from Dr.
+Robert Chen, an economist, who calculated damages of approximately $2.3
+million based on lost contracts and increased operational costs. The
+district court dismissed Dr. Chen's analysis as "speculative," but this
+assessment itself requires the weighing of competing evidence that is
+improper at the summary judgment stage.
+
+The Ninth Circuit has made clear that "credibility determinations, the
+weighing of the evidence, and the drawing of legitimate inferences from the
+facts are jury functions, not those of a judge." Anderson v. Liberty Lobby,
+477 U.S. at 255. The district court's dismissal of Dr. Chen's declaration
+violates this basic principle.
+
+
+II. APPELLANT IS ENTITLED TO INJUNCTIVE RELIEF.
+
+To obtain a permanent injunction, a plaintiff must demonstrate: (1)
+success on the merits; (2) that it would suffer irreparable harm absent the
+injunction; (3) that the balance of equities tips in its favor; and (4)
+that the public interest would not be disserved. See eBay Inc. v.
+MercExchange, L.L.C., 547 U.S. 388, 391 (2006); see also Winter v.
+Natural Resources Defense Council, Inc., 555 U.S. 7, 20 (2008).
+
+Acme satisfies each of these requirements. Because we seek reversal of
+summary judgment, the merits question is preserved for the jury. As to
+irreparable harm, Acme's expert testified that each additional month of
+service disruption risks permanent loss of at least three anchor clients,
+harm that monetary damages cannot fully compensate. The balance of equities
+clearly favors Acme, as Global Tech need only fulfill its existing
+contractual obligations. And the public interest supports enforcement of
+commercial contracts.
+
+
+CONCLUSION
+
+For the foregoing reasons, Appellant Acme Corporation respectfully requests
+that this Court reverse the district court's grant of summary judgment and
+remand this matter for further proceedings, and grant the injunctive relief
+requested.
+
+Respectfully submitted,
+
+/s/ Jane A. Smith
+JANE A. SMITH
+Smith & Associates LLP
+123 Main Street, Suite 400
+Los Angeles, CA 90001
+(213) 555-0100
+
+Counsel for Plaintiff-Appellant Acme Corporation
+
+Dated: December 1, 2024
