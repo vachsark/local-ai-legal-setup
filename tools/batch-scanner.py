@@ -5,13 +5,16 @@ author: local-ai-legal-setup
 version: 0.1.0
 license: MIT
 description: Scan a folder of contracts and produce a consolidated risk report.
-             Supports risk scanning, privilege review, and key terms extraction.
+             Supports risk scanning, privilege review, key terms extraction, and
+             optional AI-assisted narrative analysis via a local Ollama model.
 
 CLI usage:
   python3 tools/batch-scanner.py contracts/ --output risk-report.md
   python3 tools/batch-scanner.py contracts/ --focus "indemnification,termination"
   python3 tools/batch-scanner.py discovery/ --mode privilege
   python3 tools/batch-scanner.py contracts/ --mode terms --format csv
+  python3 tools/batch-scanner.py contracts/ --ai
+  python3 tools/batch-scanner.py contracts/ --ai --ai-model saulm-legal
 """
 
 import argparse
@@ -26,6 +29,19 @@ import sys
 from datetime import date
 from pathlib import Path
 from typing import Optional
+
+# ── AI model names ─────────────────────────────────────────────────────────────
+# These are the Ollama model names built by setup.sh / build-models.sh.
+# Default: contract-reviewer (qwen3.5:9b structured analysis preset)
+# SaulLM:  saulm-legal (SaulLM-7B trained on 30B legal tokens, deeper legal reasoning)
+AI_MODEL_DEFAULT = "contract-reviewer"
+AI_MODEL_SAULM = "saulm-legal"
+AI_MODEL_ALIASES = {
+    "saulm": AI_MODEL_SAULM,
+    "saulm-legal": AI_MODEL_SAULM,
+    "default": AI_MODEL_DEFAULT,
+    "contract-reviewer": AI_MODEL_DEFAULT,
+}
 
 
 # ── Content-hash disk cache ────────────────────────────────────────────────────
@@ -345,6 +361,86 @@ def score_risk(signals: list[dict]) -> str:
     if "MEDIUM" in severities:
         return "MEDIUM"
     return "LOW"
+
+
+def ai_analyze_signals(
+    doc_name: str,
+    signals: list[dict],
+    doc_text: str,
+    model: str = AI_MODEL_DEFAULT,
+    context_chars: int = 4000,
+) -> str:
+    """Send the regex-extracted signals to a local Ollama model for deeper narrative analysis.
+
+    The signals act as a structured pre-filter — the model doesn't need to find issues,
+    it explains and prioritizes the ones already found. This keeps the prompt small and
+    focused, making it suitable for mid-tier models (contract-reviewer / saulm-legal).
+
+    Args:
+        doc_name: Filename for reference in the prompt.
+        signals:  Risk signals from extract_risk_signals().
+        doc_text: Raw document text (truncated to context_chars for prompt budget).
+        model:    Ollama model name. Use saulm-legal for deeper legal reasoning.
+        context_chars: Max chars of document text to include in the prompt.
+
+    Returns:
+        A narrative analysis string, or an error message if Ollama is unavailable.
+    """
+    if not signals:
+        return "No risk signals detected — no AI analysis needed."
+
+    # Build a compact signal summary for the prompt
+    signal_lines = []
+    for sig in signals:
+        sev = sig.get("severity", "?")
+        label = sig.get("label", "")
+        hint = sig.get("hint", "")
+        excerpt = sig.get("excerpt", "")[:150].replace("\n", " ")
+        signal_lines.append(f"[{sev}] {label}\n  Hint: {hint}\n  Excerpt: \"{excerpt}\"")
+    signal_summary = "\n\n".join(signal_lines)
+
+    # Truncate the document text so the full prompt stays within model context
+    doc_snippet = doc_text[:context_chars].strip()
+    if len(doc_text) > context_chars:
+        doc_snippet += f"\n... [document truncated at {context_chars} chars]"
+
+    prompt = f"""You are reviewing a contract for an attorney. Automated analysis found these risk signals:
+
+=== DETECTED SIGNALS ===
+{signal_summary}
+
+=== DOCUMENT EXCERPT ===
+{doc_snippet}
+
+=== YOUR TASK ===
+1. Briefly explain why each HIGH-severity signal is a real risk in this contract's context (cite the specific language).
+2. Identify which 1-2 signals require the most urgent attorney attention and why.
+3. Note any signal that appears to be a false positive based on the surrounding context.
+4. One-sentence summary of the contract's overall risk profile.
+
+Be concise. Do not fabricate case citations. Do not invent facts not present in the document.
+Document: {doc_name}"""
+
+    try:
+        result = subprocess.run(
+            ["ollama", "run", model, prompt],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            err = result.stderr.strip()[:200] if result.stderr else "unknown error"
+            return f"[AI analysis failed: ollama returned exit code {result.returncode} — {err}]"
+        output = result.stdout.strip()
+        if not output:
+            return f"[AI analysis returned empty output. Is model '{model}' built? Run: ollama create {model} -f Modelfile.{model}]"
+        return output
+    except FileNotFoundError:
+        return "[AI analysis unavailable: 'ollama' command not found. Install Ollama from https://ollama.com]"
+    except subprocess.TimeoutExpired:
+        return f"[AI analysis timed out after 120s for '{model}'. Try a faster model (contract-reviewer) or reduce document size.]"
+    except Exception as e:
+        return f"[AI analysis error: {e}]"
 
 
 def extract_privilege_signals(text: str) -> tuple[str, list[dict]]:
@@ -755,6 +851,17 @@ def format_risk_report(results: list[dict], focus_terms: Optional[list[str]]) ->
                         excerpt = s["excerpt"][:200].replace("\n", " ")
                         lines.append(f"  > *\"{excerpt}\"*")
 
+        # AI analysis section (only present when --ai flag was used)
+        ai_analysis = r.get("ai_analysis")
+        if ai_analysis:
+            lines += [
+                "",
+                "**AI Analysis** *(requires attorney review — do not rely on AI conclusions)*:",
+                "",
+            ]
+            for line in ai_analysis.splitlines():
+                lines.append(line)
+
         lines.append("")
 
     return "\n".join(lines)
@@ -915,6 +1022,7 @@ def process_batch(
     output_path: Optional[Path],
     fmt: str,
     resume: bool,
+    ai_model: Optional[str] = None,
 ) -> str:
     docs = glob_documents(directory)
     if not docs:
@@ -1004,6 +1112,14 @@ def process_batch(
                 }
                 if warning:
                     result["warning"] = warning
+                if ai_model and signals:
+                    print(f"\n  AI analysis ({ai_model}): {doc_name}...", file=sys.stderr)
+                    result["ai_analysis"] = ai_analyze_signals(
+                        doc_name=doc_name,
+                        signals=signals,
+                        doc_text=text,
+                        model=ai_model,
+                    )
 
             elif mode == "privilege":
                 classification, signals = extract_privilege_signals(text)
@@ -1166,6 +1282,8 @@ Examples:
   python3 tools/batch-scanner.py contracts/ --output risk-report.md
   python3 tools/batch-scanner.py contracts/ --focus "indemnification,termination,auto-renewal"
   python3 tools/batch-scanner.py discovery/ --mode privilege
+  python3 tools/batch-scanner.py contracts/ --ai
+  python3 tools/batch-scanner.py contracts/ --ai --ai-model saulm
   python3 tools/batch-scanner.py contracts/ --mode terms --format csv
   python3 tools/batch-scanner.py contracts/ --mode terms --output terms.md
   python3 tools/batch-scanner.py contracts/ --mode query --focus "uncapped indemnification"
@@ -1205,6 +1323,30 @@ Examples:
             "More reliable than file-name resuming: editing a contract forces reprocessing."
         ),
     )
+    parser.add_argument(
+        "--ai",
+        action="store_true",
+        default=False,
+        help=(
+            "After regex scanning, send each document's risk signals to a local Ollama model "
+            "for AI-assisted narrative analysis. Only applies to --mode risk. "
+            "Default model: contract-reviewer (qwen3.5:9b). "
+            "Use --ai-model saulm to use SaulLM (trained on 30B legal tokens) for deeper analysis. "
+            "Requires Ollama running and the target model built (./build-models.sh)."
+        ),
+    )
+    parser.add_argument(
+        "--ai-model",
+        default=None,
+        metavar="MODEL",
+        help=(
+            "Which Ollama model to use for AI analysis (requires --ai). "
+            "Options: 'contract-reviewer' (default, fast qwen3.5:9b preset), "
+            "'saulm' or 'saulm-legal' (SaulLM specialist legal model, slower but "
+            "trained on 30B legal tokens including court opinions, SEC filings, legislation). "
+            "Any other Ollama model name is also accepted."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -1222,9 +1364,23 @@ Examples:
         if args.focus else None
     )
 
+    # Resolve AI model name
+    ai_model: Optional[str] = None
+    if args.ai:
+        if args.mode != "risk":
+            print(
+                "Warning: --ai is only supported with --mode risk. AI analysis skipped.",
+                file=sys.stderr,
+            )
+        else:
+            raw_model = args.ai_model or AI_MODEL_DEFAULT
+            ai_model = AI_MODEL_ALIASES.get(raw_model.lower(), raw_model)
+
     print(f"\n  Batch Scanner — mode: {args.mode}", file=sys.stderr)
     if focus_terms:
         print(f"  Focus terms: {', '.join(focus_terms)}", file=sys.stderr)
+    if ai_model:
+        print(f"  AI analysis: enabled (model: {ai_model})", file=sys.stderr)
     print("", file=sys.stderr)
 
     if args.mode == "query":
@@ -1249,6 +1405,7 @@ Examples:
             output_path=output_path,
             fmt=args.format,
             resume=args.resume,
+            ai_model=ai_model,
         )
 
     if output_path:

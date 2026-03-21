@@ -786,6 +786,89 @@ To rebuild models manually:
 
 ---
 
+## Batch Contract Scanner (`tools/batch-scanner.py`)
+
+A command-line tool for scanning folders of contracts and generating consolidated risk, privilege, and key-terms reports. Runs entirely offline using regex-based pattern matching. Optionally feeds results to a local AI model for narrative analysis.
+
+### Quick Start
+
+```bash
+# Risk scan — identify HIGH/MEDIUM/LOW risk contracts
+python3 tools/batch-scanner.py contracts/ --output risk-report.md
+
+# Focus on specific terms
+python3 tools/batch-scanner.py contracts/ --focus "indemnification,auto-renewal,termination"
+
+# Privilege review (discovery sets)
+python3 tools/batch-scanner.py discovery/ --mode privilege --output privilege-log.md
+
+# Extract financial amounts, dates, and parties
+python3 tools/batch-scanner.py contracts/ --mode terms
+python3 tools/batch-scanner.py contracts/ --mode terms --format csv --output terms.csv
+
+# Cross-document query (find every contract with uncapped indemnification)
+python3 tools/batch-scanner.py contracts/ --mode query --focus "uncapped indemnification"
+```
+
+### AI-Assisted Analysis (`--ai`)
+
+After regex scanning, pass each document's detected signals to a local AI model for deeper narrative analysis. The AI explains _why_ each flagged clause is a risk in context, identifies which issues need the most urgent attorney attention, and flags potential false positives.
+
+```bash
+# AI analysis with default model (contract-reviewer — qwen3.5:9b, fast)
+python3 tools/batch-scanner.py contracts/ --ai
+
+# AI analysis with SaulLM (trained on 30B legal tokens — court opinions, SEC filings, legislation)
+python3 tools/batch-scanner.py contracts/ --ai --ai-model saulm
+
+# Combined: focus + AI analysis
+python3 tools/batch-scanner.py contracts/ --focus "indemnification" --ai --ai-model saulm --output report.md
+```
+
+#### AI Model Options
+
+| Model flag         | Ollama model        | Speed   | Best For                                          |
+| ------------------ | ------------------- | ------- | ------------------------------------------------- |
+| _(default)_        | `contract-reviewer` | ~55 t/s | Fast structured analysis (qwen3.5:9b preset)      |
+| `--ai-model saulm` | `saulm-legal`       | ~30 t/s | Deeper legal reasoning (SaulLM, 30B legal tokens) |
+
+**SaulLM** (`saulm-legal`) is the specialist model for this use case. It was trained on court opinions, legislative text, SEC filings, and regulatory documents — it understands legal language natively rather than treating it as a domain adaptation of general text. Use it when the contract involves complex provisions, jurisdictional nuances, or when the generic model's analysis feels shallow.
+
+**When to use `--ai`**: After the regex scan identifies HIGH-risk documents, run `--ai` on those specific documents (or the entire folder) to get a narrative that explains the risk in contract context. The AI analysis supplements the signal list — it doesn't replace independent attorney review.
+
+> **Note**: AI analysis requires Ollama running and the target model built. Build both with `./build-models.sh`. The `saulm-legal` model additionally requires `saulm-7b-instruct-q8.gguf` in the repo root.
+
+### Modes
+
+| Mode        | What It Does                                                                 |
+| ----------- | ---------------------------------------------------------------------------- |
+| `risk`      | Detect HIGH/MEDIUM/LOW risk clauses (default)                                |
+| `privilege` | Flag documents likely protected by attorney-client or work product privilege |
+| `terms`     | Extract financial amounts, percentages, dates, and parties                   |
+| `query`     | Search cached results across all documents for specific terms                |
+
+### Options
+
+```
+--mode, -M    risk (default) | privilege | terms | query
+--output, -o  Write report to file (default: stdout)
+--focus, -f   Comma-separated focus terms (biases risk scan; required for query mode)
+--format      markdown (default) | csv  (terms mode only)
+--resume      Skip unchanged files using content-hash cache (requires --output)
+--ai          Enable AI narrative analysis (risk mode only)
+--ai-model    Model for AI analysis: contract-reviewer (default) | saulm | any Ollama model
+```
+
+### What Gets Detected
+
+**27 risk patterns** including: uncapped indemnification, auto-renewal, unilateral termination, mandatory arbitration, jury waiver, non-compete, unlimited liability, assignment without consent, perpetual obligations, and clauses from Ken Adams' MSCD (shall/will mixing, Oxford comma risk, ejusdem generis).
+
+**16 privilege markers** including: attorney-client privilege headers, work product markers, in-house counsel references, litigation holds, "without prejudice" markers, and direction-of-counsel language.
+
+**Content-hash cache**: Results are cached by SHA-256 of file contents. Re-runs only process changed files — editing a contract forces reprocessing even if the filename is unchanged.
+
+---
+
 ## Tools (Import Manually)
 
 Three custom tools are included in the `tools/` folder. Unlike presets, tools must be imported manually into Open WebUI.
