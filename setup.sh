@@ -171,14 +171,15 @@ done
 step "4/10: Downloading AI models (this takes a while)"
 
 echo ""
-echo "Pulling 3 models for legal work + embedding model for document search:"
-echo "  1. gemma3:12b       (8GB)   — Fast, great for summarization and drafting"
-echo "  2. qwen3.5:9b        (6GB)   — Best instruction following (IFEval 91.5), structured analysis"
-echo "  3. mistral-small    (14GB)  — Most capable, best for complex reasoning"
-echo "  4. nomic-embed-text (274MB) — Embedding model for document upload (RAG)"
+echo "Pulling 3 models for legal work + embedding models for hybrid document search:"
+echo "  1. gemma3:12b            (8GB)   — Fast, great for summarization and drafting"
+echo "  2. qwen3.5:9b            (6GB)   — Best instruction following (IFEval 91.5), structured analysis"
+echo "  3. mistral-small         (14GB)  — Most capable, best for complex reasoning"
+echo "  4. nomic-embed-text      (274MB) — Embedding model for hybrid document search (RAG)"
+echo "  5. qwen3-embedding:0.6b  (639MB) — Alternate embedding model (auto-detected if nomic absent)"
 echo ""
 
-models=("gemma3:12b" "qwen3.5:9b" "mistral-small:24b" "nomic-embed-text")
+models=("gemma3:12b" "qwen3.5:9b" "mistral-small:24b" "nomic-embed-text" "qwen3-embedding:0.6b")
 
 for model in "${models[@]}"; do
     if ollama list 2>/dev/null | grep -q "$(echo "$model" | cut -d: -f1)"; then

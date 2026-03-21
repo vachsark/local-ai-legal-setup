@@ -1,10 +1,20 @@
 """
 title: Deposition Prep Assistant
 author: local-ai-legal-setup
-version: 0.1.0
+version: 0.2.0
 license: MIT
 description: Analyze prior deposition transcripts, generate follow-up questions, flag
   contradictions and evasion, and build topic outlines. Upload a transcript to get started.
+
+  v0.2.0 additions:
+  - Court-reporter formatting: THE WITNESS, BY MR./MS., attorney colloquy
+  - Procedural markers: exhibit markings, recesses, off-record, videotape events
+  - Multi-volume: VOLUME I/II, Day 1/2, continuous page tracking
+  - Multi-witness: different examiners tracked per exchange
+  - Interpreter-mediated testimony
+  - Timeline extraction (dates mentioned in testimony)
+  - Exhibit cross-reference (which exhibits discussed when)
+  - Key admission index for trial prep
 """
 
 import json
@@ -66,6 +76,10 @@ class Tools:
         contradictions = self._find_contradictions(exchanges)
         topics = self._identify_topic_shifts(exchanges)
         witness_name = self._extract_witness_name(text)
+        timeline = self._extract_timeline(exchanges, text)
+        exhibit_index = self._extract_exhibit_index(exchanges, text)
+        key_admissions = self._build_key_admission_index(admissions, exchanges)
+        procedural = self._extract_procedural_markers(text)
 
         await self._emit(__event_emitter__, "Analysis complete", done=True)
 
@@ -81,12 +95,19 @@ class Tools:
                 "evasion_instances": len(evasions),
                 "potential_contradictions": len(contradictions),
                 "topic_areas": len(topics),
+                "timeline_events": len(timeline),
+                "exhibits_referenced": len(exhibit_index),
+                "procedural_markers": len(procedural),
             },
             "admissions": admissions,
             "contradictions": contradictions,
             "evasion_instances": evasions,
             "objections": objections,
             "topic_areas": topics,
+            "timeline": timeline,
+            "exhibit_index": exhibit_index,
+            "key_admission_index": key_admissions,
+            "procedural_markers": procedural,
             "qa_sample": exchanges[: self.valves.max_qa_pairs_in_payload],
             "analysis_instructions": (
                 "You have been given structured pre-analysis of a deposition transcript. "
@@ -106,7 +127,13 @@ class Tools:
                 "List all objections with their grounds and the resulting answer (if any).\n\n"
                 "## 6. Topic Coverage & Gaps\n"
                 "List the major topic areas covered and identify areas that appear under-explored.\n\n"
-                "## 7. Priority Follow-Up Areas\n"
+                "## 7. Timeline of Key Events\n"
+                "Using the timeline data, build a chronological summary of dates and events "
+                "mentioned in testimony. Flag any timeline inconsistencies.\n\n"
+                "## 8. Exhibit Cross-Reference\n"
+                "For each exhibit referenced in testimony, note what it is, what the witness "
+                "admitted or denied about it, and its evidentiary significance.\n\n"
+                "## 9. Priority Follow-Up Areas\n"
                 "Ranked list of the 5-7 most important areas for continued examination."
             ),
         }
@@ -296,18 +323,21 @@ class Tools:
         """
         Parse Q/A exchanges from a deposition transcript.
 
-        Handles four transcript formats:
-          1. Standard:     "Q: Did you sign?"  / "A: Yes."
-          2. Dotted:       "Q. Did you sign?"  / "A. Yes."
-          3. Verbose:      "QUESTION: Did you sign?" / "ANSWER: Yes."
-          4. Numbered:     "  5    Q.  Did you sign?" (federal court reporter style —
-                           leading line number stripped before pattern matching)
+        Handles transcript formats:
+          1. Standard:        "Q: Did you sign?"  / "A: Yes."
+          2. Dotted:          "Q. Did you sign?"  / "A. Yes."
+          3. Verbose:         "QUESTION: Did you sign?" / "ANSWER: Yes."
+          4. Federal numbered: "  5    Q.  Did you sign?" (court reporter style)
+          5. THE WITNESS:     "THE WITNESS:  I don't recall." (answer after colloquy)
+          6. Examiner labels:  "BY MR. SMITH:" / "BY MS. JONES:" (tracked per exchange)
+          7. Colloquy:         "MR. JONES:  We need to take a break." (non-objection)
+          8. Procedural:       "(Exhibit 5 was marked.)" / "(Recess taken.)" (skipped)
+          9. Interpreter:      "THE INTERPRETER: ..." (noted, not parsed as Q/A)
 
-        Also handles VOLUME / DAY headers for multi-day depositions (pagination
-        resets are noted in page_line as "Vol.N p.PP:LL").
+        Also handles VOLUME / DAY headers for multi-volume depositions.
 
         Returns list of dicts with keys: index, page_line, question, answer,
-        objections, answer_quality.
+        objections, answer_quality, examiner.
         """
         # Normalize line endings
         text = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -321,25 +351,62 @@ class Tools:
         current_page = ""
         current_line_no = ""
         current_volume = ""
+        current_examiner = ""
         exchange_idx = 0
 
         # ── Pattern definitions ────────────────────────────────────────────────
-        # Page header: standalone number (transcript page number)
-        page_pattern = re.compile(r"^\s{0,4}(\d{1,4})\s*$")
 
-        # Volume / day header (multi-day depositions)
+        # Page header: standalone number (transcript page number).
+        # Standard transcripts: small standalone number.
+        # Federal transcripts: centered number with many leading spaces (>4).
+        # We use two variants and select based on detected format.
+        page_pattern_standard = re.compile(r"^\s{0,4}(\d{1,4})\s*$")
+        page_pattern_federal = re.compile(r"^\s{5,}(\d{1,4})\s*$")
+        # Placeholder — will be set after federal detection
+        page_pattern = page_pattern_standard
+
+        # Volume / day header (multi-volume depositions)
         volume_pattern = re.compile(
-            r"VOLUME\s+(?:I{1,3}V?|V?I{0,3}|\d+)\b.*?(?:DAY\s+\d+)?",
+            r"\b(?:VOLUME|VOL\.?)\s+(?:I{1,3}V?|V?I{0,3}|\d+)\b"
+            r"|(?:DAY|VOLUME)\s+(?:ONE|TWO|THREE|FOUR|\d+)\b",
             re.IGNORECASE,
         )
 
-        # Federal reporter numbered-line format: "   5    Q.  text"
-        # Captures: (line_number, Q_or_A_or_QUESTION_or_ANSWER, content)
-        numbered_line_pattern = re.compile(
-            r"^\s{1,6}(\d{1,2})\s{1,8}"  # leading line number (1-99)
-            r"(Q|A|QUESTION|ANSWER|BY\s+\w[\w\s\.]*?)\s*[\.:]?\s+(.*)",
+        # Examiner label: "BY MR. SMITH:" or "BY MS. JONES:" — standalone line
+        examiner_pattern = re.compile(
+            r"^BY\s+(MR\.|MS\.|MRS\.|DR\.)\s*([A-Z][A-Z\s\-\.]+?)\s*:?\s*$",
             re.IGNORECASE,
         )
+
+        # Federal reporter numbered-line format.
+        # Line numbers are 1-25, flush-left or with 1 leading space.
+        # Spacing between line number and content varies (2-8 spaces).
+        # Examples:
+        #   " 5  Q.  Did you sign?"   (1 leading space, digit, 2 spaces)
+        #   "17  Q.  text"            (no leading space, 2 digits, 2 spaces)
+        #   "21     MR. CROSS:  Obj"  (no leading space, 2 digits, 5 spaces)
+
+        # Shared prefix: optional leading space, 1-2 digit line number, 2+ spaces
+        _fed_prefix = r"^ ?(\d{1,2})\s{2,}"
+
+        numbered_line_pattern = re.compile(
+            _fed_prefix +
+            r"(Q|A|QUESTION|ANSWER|BY\s+(?:MR\.|MS\.|MRS\.|DR\.)\s*\w[\w\s\.]*?)\s*[\.:]?\s+(.*)",
+            re.IGNORECASE,
+        )
+
+        # Federal numbered line for THE WITNESS / THE INTERPRETER / attorney speech
+        numbered_speaker_pattern = re.compile(
+            _fed_prefix +
+            r"(THE\s+(?:WITNESS|INTERPRETER|COURT|VIDEOGRAPHER)"
+            r"|MR\.|MS\.|MRS\.|DR\.)"
+            r"\s*(.+)",
+            re.IGNORECASE,
+        )
+
+        # Strips a leading line number from a federal-format continuation line
+        # e.g. " 6  some text" -> ("6", "some text")
+        strip_linenum_pattern = re.compile(_fed_prefix + r"(.*)")
 
         # Standard Q/A: "Q: ...", "Q. ...", "Q  ..."
         qa_q_pattern = re.compile(r"^Q[:\.]?\s+(.*)", re.IGNORECASE)
@@ -349,13 +416,49 @@ class Tools:
         verbose_q_pattern = re.compile(r"^QUESTION\s*:\s*(.*)", re.IGNORECASE)
         verbose_a_pattern = re.compile(r"^ANSWER\s*:\s*(.*)", re.IGNORECASE)
 
+        # THE WITNESS: / THE INTERPRETER: answers (non-numbered)
+        witness_answer_pattern = re.compile(
+            r"^THE\s+(?:WITNESS|INTERPRETER)\s*:\s+(.*)", re.IGNORECASE
+        )
+
+        # Objection lines — attorney says "Objection" with grounds
         obj_pattern = re.compile(
-            r"^(?:MR\.|MS\.|MRS\.|THE COURT:|COURT:)\s+\S.*\b(?:Objection|Object)\b",
+            r"^(?:MR\.|MS\.|MRS\.|DR\.|THE COURT:|COURT:)\s+\S.*\b(?:Objection|Object)\b",
             re.IGNORECASE,
         )
+
+        # Any attorney/court speech (colloquy, motions, etc.) — to stop continuation
         obj_any = re.compile(
-            r"^(?:MR\.|MS\.|MRS\.|THE COURT:|COURT:|COUNSEL:)\s+(.+)", re.IGNORECASE
+            r"^(?:MR\.|MS\.|MRS\.|DR\.|THE COURT:|COURT:|COUNSEL:|THE VIDEOGRAPHER:)\s+(.+)",
+            re.IGNORECASE,
         )
+
+        # Procedural markers in parentheses — skip, don't treat as Q/A continuation
+        procedural_pattern = re.compile(
+            r"^\s*\((?:"
+            r"[Ee]xhibit\s+\w[\w\s\-,\.]*(?:was\s+)?(?:marked|received|admitted|introduced)"
+            r"|[Ww]hereupon"
+            r"|[Rr]ecess"
+            r"|[Dd]iscussion\s+(?:off|on)\s+the\s+record"
+            r"|[Vv]ideotape\s+(?:played|stopped|paused|resumed)"
+            r"|[Dd]ocument\s+(?:handed|shown|reviewed)"
+            r"|[Ll]unch\s+recess"
+            r"|[Oo]ff\s+the\s+record"
+            r"|[Vv]olume\s+[IVXivx\d]+"
+            r"|[Cc]ontinuation"
+            r")"
+            r".*\)\s*$",
+            re.IGNORECASE,
+        )
+
+        # Detect whether transcript is in federal numbered format
+        # (check first 100 non-empty lines for the pattern)
+        is_federal = False
+        check_lines = [l for l in lines if l.strip()][:100]
+        federal_hits = sum(1 for l in check_lines if re.match(r"^ ?\d{1,2}\s{2,}\S", l))
+        if federal_hits >= 5:
+            is_federal = True
+            page_pattern = page_pattern_federal  # override: pages are centered
 
         state = "idle"  # idle | q | a
 
@@ -382,6 +485,7 @@ class Tools:
                         "answer": a_text,
                         "objections": list(current_objections),
                         "answer_quality": quality,
+                        "examiner": current_examiner,
                     }
                 )
 
@@ -390,51 +494,169 @@ class Tools:
             if not stripped:
                 continue
 
-            # Volume/day header — update volume tracking, don't reset page
+            # ── Procedural markers in parens — skip entirely ─────────────────
+            if procedural_pattern.match(stripped):
+                continue
+
+            # ── Volume/day header ─────────────────────────────────────────────
             if volume_pattern.search(stripped) and len(stripped) < 80:
                 vm = re.search(
-                    r"VOLUME\s+(I{1,3}V?|V?I{0,3}|\d+)", stripped, re.IGNORECASE
+                    r"\b(?:VOLUME|VOL\.?)\s+(I{1,3}V?|V?I{0,3}|\d+)\b",
+                    stripped, re.IGNORECASE
                 )
                 if vm:
                     current_volume = f"Vol.{vm.group(1).upper()}"
                 continue
 
-            # Page number line — track current page
-            pm = page_pattern.match(stripped)
+            # ── Page number line ──────────────────────────────────────────────
+            # Match against raw line (not stripped) — federal pages need leading spaces
+            pm = page_pattern.match(line.rstrip())
             if pm and len(stripped) <= 4:
                 current_page = pm.group(1)
                 current_line_no = ""
                 continue
 
-            # Try numbered-line format first (federal court reporter)
-            m_num = numbered_line_pattern.match(line)  # use raw line for indent check
-            if m_num:
-                line_no_str, role, content = m_num.group(1), m_num.group(2).strip(), m_num.group(3).strip()
-                current_line_no = line_no_str
-                role_upper = role.upper().split()[0]  # "BY" -> "BY", "Q" -> "Q", etc.
-                if role_upper in ("Q", "QUESTION"):
-                    flush_exchange()
-                    current_q = [content]
-                    current_a = []
-                    current_objections = []
-                    state = "q"
-                    continue
-                elif role_upper in ("A", "ANSWER"):
-                    current_a = [content]
-                    state = "a"
-                    continue
-                # "BY MR. JONES:" lines are examiner labels — skip
-                elif role_upper == "BY":
+            # ── Examiner label (standalone "BY MR. SMITH:") ───────────────────
+            m_exam = examiner_pattern.match(stripped)
+            if m_exam:
+                current_examiner = f"{m_exam.group(1)} {m_exam.group(2).strip()}".strip()
+                state = "idle"  # next content is a new question block
+                continue
+
+            # ── Federal numbered-line formats ─────────────────────────────────
+            if is_federal:
+                m_num = numbered_line_pattern.match(line)
+                m_spk = numbered_speaker_pattern.match(line)
+
+                if m_num:
+                    line_no_str = m_num.group(1)
+                    role = m_num.group(2).strip()
+                    content = m_num.group(3).strip()
+                    current_line_no = line_no_str
+                    role_upper = role.upper()
+                    role_first = role_upper.split()[0]
+
+                    if role_first in ("Q", "QUESTION"):
+                        flush_exchange()
+                        current_q = [content]
+                        current_a = []
+                        current_objections = []
+                        state = "q"
+                        continue
+                    elif role_first in ("A", "ANSWER"):
+                        if state == "q" and not current_a:
+                            current_a = [content]
+                        elif state == "a":
+                            current_a.append(content)
+                        else:
+                            current_a = [content]
+                        state = "a"
+                        continue
+                    elif role_first == "BY":
+                        em = re.match(
+                            r"BY\s+(MR\.|MS\.|MRS\.|DR\.)\s*([A-Z][\w\s\.]+)",
+                            role, re.IGNORECASE
+                        )
+                        if em:
+                            current_examiner = f"{em.group(1)} {em.group(2).strip()}".strip()
+                        state = "idle"
+                        continue
+
+                elif m_spk:
+                    line_no_str = m_spk.group(1)
+                    speaker_prefix = m_spk.group(2).strip()  # e.g. "MR." or "THE WITNESS"
+                    rest = m_spk.group(3).strip()             # e.g. "CROSS:  Objection.  Vague"
+                    current_line_no = line_no_str
+                    speaker_upper = speaker_prefix.upper()
+
+                    # THE WITNESS / THE INTERPRETER — answer text
+                    if "WITNESS" in speaker_upper or "INTERPRETER" in speaker_upper:
+                        # rest starts with ":  text" — strip the colon
+                        content = re.sub(r"^:\s*", "", rest).strip()
+                        if content:
+                            if state == "q" and not current_a:
+                                current_a = [content]
+                                state = "a"
+                            elif state == "a":
+                                current_a.append(content)
+                        continue
+
+                    # MR./MS./DR. attorney speech
+                    # rest = "SMITH:  Objection.  Foundation." or "SMITH:  We'd like to..."
+                    # Reconstruct as "MR. SMITH:  Objection.  Foundation."
+                    reconstructed = f"{speaker_prefix} {rest}"
+                    if re.search(r"\bObjection\b", reconstructed, re.IGNORECASE):
+                        grounds = self._extract_objection_grounds(reconstructed)
+                        current_objections.append({
+                            "text": reconstructed.strip(),
+                            "grounds": grounds,
+                            "exchange_index": exchange_idx + 1,
+                        })
+                    # else: colloquy — ignore (don't append to Q or A)
                     continue
 
+                else:
+                    # Federal continuation line — has line number prefix, strip it
+                    m_cont = strip_linenum_pattern.match(line)
+                    if m_cont:
+                        line_no_str = m_cont.group(1)
+                        content = m_cont.group(2).strip()
+                        current_line_no = line_no_str
+
+                        if not content:
+                            continue
+
+                        # Skip procedural/header content in continuation
+                        if procedural_pattern.match(f"({content})") or procedural_pattern.match(content):
+                            continue
+
+                        # Check for attorney speech in continuation (e.g. "MR. CROSS:  Objection.")
+                        if obj_pattern.match(content):
+                            grounds = self._extract_objection_grounds(content)
+                            current_objections.append({
+                                "text": content,
+                                "grounds": grounds,
+                                "exchange_index": exchange_idx + 1,
+                            })
+                            continue
+                        if obj_any.match(content):
+                            continue  # colloquy continuation — skip
+
+                        # BY MR. / BY MS. in continuation
+                        m_exam_cont = examiner_pattern.match(content)
+                        if m_exam_cont:
+                            current_examiner = f"{m_exam_cont.group(1)} {m_exam_cont.group(2).strip()}".strip()
+                            state = "idle"
+                            continue
+
+                        # THE WITNESS: in continuation
+                        m_wit_cont = witness_answer_pattern.match(content)
+                        if m_wit_cont:
+                            wit_text = m_wit_cont.group(1).strip()
+                            if state == "q" and not current_a:
+                                current_a = [wit_text]
+                                state = "a"
+                            elif state == "a":
+                                current_a.append(wit_text)
+                            continue
+
+                        # Regular continuation
+                        if state == "q":
+                            current_q.append(content)
+                        elif state == "a":
+                            current_a.append(content)
+                    continue
+
+            # ── Non-numbered (non-federal) formats ────────────────────────────
             m_q = qa_q_pattern.match(stripped)
             m_a = qa_a_pattern.match(stripped)
             m_vq = verbose_q_pattern.match(stripped)
             m_va = verbose_a_pattern.match(stripped)
             m_obj = obj_pattern.match(stripped)
+            m_wit = witness_answer_pattern.match(stripped)
+            m_attorney = obj_any.match(stripped)
 
             if m_vq:
-                # QUESTION: ... (verbose format)
                 flush_exchange()
                 current_q = [m_vq.group(1)]
                 current_a = []
@@ -442,12 +664,10 @@ class Tools:
                 state = "q"
 
             elif m_va:
-                # ANSWER: ... (verbose format)
                 current_a = [m_va.group(1)]
                 state = "a"
 
             elif m_q:
-                # New question — flush prior exchange
                 flush_exchange()
                 current_q = [m_q.group(1)]
                 current_a = []
@@ -458,8 +678,17 @@ class Tools:
                 current_a = [m_a.group(1)]
                 state = "a"
 
+            elif m_wit:
+                # THE WITNESS: answer (occurs after colloquy/objection)
+                content = m_wit.group(1).strip()
+                if state in ("q", "a"):
+                    if not current_a:
+                        current_a = [content]
+                    else:
+                        current_a.append(content)
+                    state = "a"
+
             elif m_obj:
-                # Objection between Q and A, or after Q before A
                 full_obj = stripped
                 grounds = self._extract_objection_grounds(full_obj)
                 current_objections.append(
@@ -470,14 +699,16 @@ class Tools:
                     }
                 )
 
+            elif m_attorney:
+                # Other attorney speech (colloquy, statements) — don't append to Q or A
+                pass
+
             elif state == "q" and not m_a and not m_obj:
-                # Continuation of question
-                if stripped and not obj_any.match(stripped):
+                if stripped:
                     current_q.append(stripped)
 
             elif state == "a" and not m_q and not m_obj:
-                # Continuation of answer
-                if stripped and not obj_any.match(stripped):
+                if stripped:
                     current_a.append(stripped)
 
         # Flush last exchange
@@ -554,26 +785,37 @@ class Tools:
         return "responsive"
 
     def _extract_objections(self, text: str) -> list:
-        """Extract all objections with their stated grounds from raw transcript text."""
+        """Extract all objections with their stated grounds from raw transcript text.
+
+        Handles both standard and federal (line-numbered) formats:
+          Standard:  "MR. CROSS: Objection. Foundation."
+          Federal:   "21     MR. CROSS:  Objection.  Foundation."
+        """
         objections = []
         seen = set()
 
+        # Optional leading line number prefix for federal format: "21     "
+        _fed_num_prefix = r"(?:^ ?\d{1,2}\s{2,})?"
+
         obj_line_pattern = re.compile(
-            r"^(?:MR\.|MS\.|MRS\.|THE COURT:|COUNSEL:)\s+"
+            _fed_num_prefix
+            + r"(?:MR\.|MS\.|MRS\.|DR\.|THE COURT:|COUNSEL:)\s+"
             r"(?:[A-Z][A-Z\s\.]+:\s+)?Objection[,\.]?\s*(.*)",
             re.IGNORECASE | re.MULTILINE,
         )
 
         for m in obj_line_pattern.finditer(text):
             full = m.group(0).strip()
+            # Strip the leading line number from the recorded objection text
+            full_clean = re.sub(r"^ ?\d{1,2}\s{2,}", "", full).strip()
             grounds_raw = m.group(1).strip().rstrip(".")
             if not grounds_raw:
                 grounds_raw = "unstated"
-            key = full[:80].lower()
+            key = full_clean[:80].lower()
             if key not in seen:
                 objections.append(
                     {
-                        "objection": full,
+                        "objection": full_clean,
                         "grounds": self._normalize_objection_grounds(grounds_raw),
                         "raw_grounds": grounds_raw,
                     }
@@ -584,7 +826,7 @@ class Tools:
 
     def _extract_objection_grounds(self, obj_text: str) -> str:
         after = re.sub(
-            r"^(?:MR\.|MS\.|MRS\.|THE COURT:|COUNSEL:)\s+(?:[A-Z]+:\s+)?Objection[,\.]?\s*",
+            r"^(?:MR\.|MS\.|MRS\.|DR\.|THE COURT:|COUNSEL:)\s+(?:[A-Z]+:\s+)?Objection[,\.]?\s*",
             "",
             obj_text,
             flags=re.IGNORECASE,
@@ -820,7 +1062,8 @@ class Tools:
     def _extract_witness_name(self, text: str) -> str:
         """Extract the deponent's name from standard transcript headers."""
         patterns = [
-            r"DEPOSITION OF ([A-Z][A-Z ,.]+)",
+            r"DEPOSITION OF ([A-Z][A-Z\-\' ,.]+)",
+            r"VIDEOTAPED DEPOSITION OF\s+([A-Z][A-Za-z\-\' ,.]+)",
             r"EXAMINATION OF ([A-Z][A-Z ,.]+)",
             r"DEPONENT[:\s]+([A-Z][A-Za-z ,.\-]+)",
             r"WITNESS[:\s]+([A-Z][A-Za-z ,.\-]+)",
@@ -828,8 +1071,259 @@ class Tools:
         for pat in patterns:
             m = re.search(pat, text[:3000])
             if m:
-                return m.group(1).strip().title()
+                name = m.group(1).strip()
+                # Remove trailing metadata that sometimes follows the name
+                name = re.split(r"\s{2,}|\n", name)[0].strip()
+                return name.title()
         return ""
+
+    def _extract_timeline(self, exchanges: list, raw_text: str) -> list:
+        """
+        Extract dates and temporal references mentioned in testimony.
+
+        Finds: specific dates ("January 2022", "March 15, 2023"),
+        relative references ("six months later", "before the contract"),
+        and associates each with the exchange it appears in.
+
+        Returns a list of timeline events sorted chronologically where possible.
+        """
+        # Patterns for specific dates
+        date_patterns = [
+            # Full date: "January 15, 2023" / "March 15th, 2023"
+            (re.compile(
+                r"\b(January|February|March|April|May|June|July|August|September|"
+                r"October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+(\d{4})\b",
+                re.IGNORECASE
+            ), "full_date"),
+            # Month + year: "January 2022"
+            (re.compile(
+                r"\b(January|February|March|April|May|June|July|August|September|"
+                r"October|November|December)\s+(?:of\s+)?(\d{4})\b",
+                re.IGNORECASE
+            ), "month_year"),
+            # Year only when preceded by temporal context: "in 2021", "during 2022"
+            (re.compile(
+                r"\b(?:in|during|since|from|through|until|by)\s+(\d{4})\b",
+                re.IGNORECASE
+            ), "year_ref"),
+            # Relative: Q1/Q2/Q3/Q4 + year
+            (re.compile(
+                r"\b(Q[1-4])\s+(?:of\s+)?(\d{4})\b",
+                re.IGNORECASE
+            ), "quarter_year"),
+            # Season + year
+            (re.compile(
+                r"\b(spring|summer|fall|autumn|winter)\s+(?:of\s+)?(\d{4})\b",
+                re.IGNORECASE
+            ), "season_year"),
+        ]
+
+        seen_events = {}  # key -> event dict, to deduplicate
+
+        for ex in exchanges:
+            combined = ex["question"] + " " + ex["answer"]
+            for pattern, date_type in date_patterns:
+                for m in pattern.finditer(combined):
+                    date_str = m.group(0).strip()
+                    # Extract year for sort key
+                    year_match = re.search(r"\d{4}", date_str)
+                    sort_year = int(year_match.group()) if year_match else 9999
+
+                    key = date_str.lower()
+                    if key not in seen_events:
+                        seen_events[key] = {
+                            "date_reference": date_str,
+                            "date_type": date_type,
+                            "sort_year": sort_year,
+                            "exchange": ex["index"],
+                            "page_line": ex["page_line"],
+                            "context": combined[:200].strip(),
+                        }
+
+        events = sorted(seen_events.values(), key=lambda e: (e["sort_year"], e["date_reference"]))
+        # Remove sort_year from output (internal only)
+        for e in events:
+            del e["sort_year"]
+        return events[:50]
+
+    def _extract_exhibit_index(self, exchanges: list, raw_text: str) -> list:
+        """
+        Build an exhibit cross-reference: for each exhibit marked or referenced,
+        record what the witness said about it and in which exchanges.
+
+        Handles formats:
+          - "Exhibit 3" / "Exhibit A" / "Plaintiff's Exhibit 3" / "Defense Exhibit B"
+          - "(Exhibit 5 was marked for identification.)"
+          - "Defendants' Exhibit 12"
+        """
+        exhibit_pattern = re.compile(
+            r"\b(?:(?:Plaintiff(?:'s)?|Defense(?:'s)?|Defendant(?:'s)?|"
+            r"Plaintiffs(?:')?|Defendants(?:')?)?\s*)?"
+            r"Exhibit[s]?\s+([A-Z0-9]{1,4}(?:-[A-Z0-9]+)?)\b",
+            re.IGNORECASE,
+        )
+
+        # Marker lines from raw text for initial identification
+        marker_pattern = re.compile(
+            r"\(Exhibit\s+([A-Z0-9]{1,4}(?:-[A-Z0-9]+)?)[^)]*(?:marked|received|admitted|introduced)",
+            re.IGNORECASE,
+        )
+
+        exhibits: dict = {}  # exhibit_id -> { description, exchanges_mentioned }
+
+        # Find marked exhibits in raw text
+        for m in marker_pattern.finditer(raw_text):
+            eid = m.group(1).upper()
+            context = m.group(0)
+            if eid not in exhibits:
+                exhibits[eid] = {
+                    "exhibit_id": eid,
+                    "description": context.strip("()").strip(),
+                    "exchanges_mentioned": [],
+                    "witness_response_summary": [],
+                }
+
+        # Find exhibits referenced in Q/A
+        for ex in exchanges:
+            combined = ex["question"] + " " + ex["answer"]
+            found_in_exchange = set()
+            for m in exhibit_pattern.finditer(combined):
+                eid = m.group(1).upper()
+                if eid not in found_in_exchange:
+                    found_in_exchange.add(eid)
+                    if eid not in exhibits:
+                        exhibits[eid] = {
+                            "exhibit_id": eid,
+                            "description": f"Referenced in exchange {ex['index']}",
+                            "exchanges_mentioned": [],
+                            "witness_response_summary": [],
+                        }
+                    exhibits[eid]["exchanges_mentioned"].append(ex["index"])
+                    # Summarize witness's response quality about this exhibit
+                    quality = ex["answer_quality"]
+                    if quality in ("admission", "denial"):
+                        exhibits[eid]["witness_response_summary"].append(
+                            f"Exchange {ex['index']}: {quality} — {ex['answer'][:100]}"
+                        )
+
+        return sorted(exhibits.values(), key=lambda e: e["exhibit_id"])
+
+    def _build_key_admission_index(self, admissions: list, exchanges: list) -> list:
+        """
+        Build a quick-reference index of the most significant admissions for trial prep.
+
+        Ranks admissions by:
+          1. How short/direct the answer is (shorter = harder to walk back)
+          2. Whether an objection was overruled (witness still answered)
+          3. Topic significance (based on keywords)
+
+        Returns top 15 admissions with trial-prep notes.
+        """
+        HIGH_VALUE_KEYWORDS = {
+            "knew", "know", "aware", "told", "said", "signed", "approved",
+            "authorized", "agreed", "acknowledged", "confirmed", "responsible",
+            "directed", "caused", "failed", "never", "always", "did not",
+            "did not disclose", "did not tell", "did not inform",
+        }
+
+        scored = []
+        for adm in admissions:
+            score = 0
+            a_lower = adm["answer"].lower()
+            q_lower = adm["question"].lower()
+
+            # Short answer = strong admission
+            word_count = len(adm["answer"].split())
+            if word_count <= 3:
+                score += 3
+            elif word_count <= 10:
+                score += 2
+            elif word_count <= 20:
+                score += 1
+
+            # High-value keywords in question or answer
+            for kw in HIGH_VALUE_KEYWORDS:
+                if kw in a_lower or kw in q_lower:
+                    score += 1
+
+            # Objection raised but witness answered anyway — legally significant
+            if adm.get("objections") or (
+                adm.get("exchange") and any(
+                    e["index"] == adm["exchange"] and e["objections"]
+                    for e in exchanges
+                )
+            ):
+                score += 2
+
+            # Direct yes/correct/absolutely = highest value
+            if re.match(r"^(?:yes|correct|absolutely|that'?s right|i did|i was)\b", a_lower):
+                score += 2
+
+            scored.append({**adm, "_score": score})
+
+        scored.sort(key=lambda x: -x["_score"])
+        result = []
+        for item in scored[:15]:
+            score = item.pop("_score")
+            item["trial_prep_note"] = (
+                "Strong admission — short, direct answer." if score >= 6
+                else "Useful admission — consider impeachment sequence."
+                if score >= 3
+                else "Admission — review in context."
+            )
+            result.append(item)
+        return result
+
+    def _extract_procedural_markers(self, text: str) -> list:
+        """
+        Extract procedural events from the transcript:
+        exhibit markings, recesses, off-record discussions, videotape events.
+
+        These are important for trial prep (knowing what was marked, when breaks occurred).
+        """
+        marker_pattern = re.compile(
+            r"\(((?:"
+            r"[Ee]xhibit\s+\w[\w\s\-,\.]*(?:was\s+)?(?:marked|received|admitted|introduced)[^)]*"
+            r"|[Ww]hereupon[^)]*"
+            r"|[Rr]ecess[^)]*"
+            r"|[Dd]iscussion\s+(?:off|on)\s+the\s+record[^)]*"
+            r"|[Vv]ideotape\s+(?:played|stopped|paused|resumed)[^)]*"
+            r"|[Ll]unch\s+recess[^)]*"
+            r"|[Oo]ff\s+the\s+record[^)]*"
+            r"))\)",
+            re.IGNORECASE,
+        )
+
+        markers = []
+        seen = set()
+        for m in marker_pattern.finditer(text):
+            text_content = m.group(1).strip()
+            key = text_content.lower()[:60]
+            if key in seen:
+                continue
+            seen.add(key)
+
+            # Categorize
+            t = text_content.lower()
+            if "exhibit" in t and any(w in t for w in ("marked", "received", "admitted", "introduced")):
+                category = "exhibit_marked"
+            elif "recess" in t or "lunch" in t:
+                category = "recess"
+            elif "off the record" in t or "discussion" in t:
+                category = "off_record"
+            elif "videotape" in t:
+                category = "videotape"
+            elif "whereupon" in t:
+                category = "procedural"
+            else:
+                category = "procedural"
+
+            markers.append({
+                "category": category,
+                "text": text_content,
+            })
+
+        return markers
 
     # ── File extraction (shared pattern) ──────────────────────────────────────
 

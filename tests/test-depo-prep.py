@@ -298,6 +298,187 @@ async def test_edge_cases(tools: Tools) -> bool:
     return all_pass
 
 
+FEDERAL_TRANSCRIPT = os.path.join(os.path.dirname(__file__), "sample-deposition-federal.txt")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Test 5: Federal format (numbered lines, THE WITNESS, BY MR., multi-volume)
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def test_federal_format(tools: Tools) -> bool:
+    print(f"\n{BOLD}Test 5: federal transcript format{RESET}")
+
+    if not os.path.exists(FEDERAL_TRANSCRIPT):
+        print(f"  {WARN} Federal transcript not found at {FEDERAL_TRANSCRIPT} — skipping")
+        return True
+
+    with open(FEDERAL_TRANSCRIPT, "r") as f:
+        content = f.read()
+
+    file_obj = {"filename": "sample-deposition-federal.txt", "content": content}
+    result = await tools.analyze_transcript(
+        __files__=[file_obj],
+        __event_emitter__=mock_emitter,
+    )
+
+    try:
+        data = json.loads(result)
+    except json.JSONDecodeError as e:
+        print(f"  {FAIL} — invalid JSON: {e}")
+        return False
+
+    stats = data.get("stats", {})
+    errors = []
+
+    # Should parse exchanges from the federal numbered format
+    if stats.get("total_exchanges", 0) < 15:
+        errors.append(f"Expected >=15 exchanges from federal format, got {stats.get('total_exchanges')}")
+
+    # Should extract witness name (Priya Anand-Mehta)
+    witness = data.get("witness", "")
+    if "anand" not in witness.lower() and "mehta" not in witness.lower():
+        errors.append(f"Witness name not extracted from federal header: got '{witness}'")
+
+    # Should have objections
+    if stats.get("total_objections", 0) < 5:
+        errors.append(f"Expected >=5 objections, got {stats.get('total_objections')}")
+
+    # Should have timeline events (the transcript mentions many specific dates)
+    if stats.get("timeline_events", 0) < 3:
+        errors.append(f"Expected >=3 timeline events, got {stats.get('timeline_events')}")
+
+    # Should have exhibit index (Exhibit 1, 3, 4, 5, 6, 12, 13 referenced)
+    if stats.get("exhibits_referenced", 0) < 3:
+        errors.append(f"Expected >=3 exhibits, got {stats.get('exhibits_referenced')}")
+
+    # Should have procedural markers (recess, off-record, videotape, exhibit markings)
+    if stats.get("procedural_markers", 0) < 2:
+        errors.append(f"Expected >=2 procedural markers, got {stats.get('procedural_markers')}")
+
+    # Volume tracking — transcript has VOLUME I and VOLUME II
+    # At least some exchanges from Vol.II should be present
+    qa_sample = data.get("qa_sample", [])
+    vol2_exchanges = [e for e in qa_sample if "Vol.II" in e.get("page_line", "")]
+    if not vol2_exchanges:
+        errors.append("No Volume II exchanges found — multi-volume handling may be broken")
+
+    if errors:
+        for e in errors:
+            print(f"  {FAIL} — {e}")
+        print(f"\n  Stats: {json.dumps(stats, indent=4)}")
+        if qa_sample:
+            print(f"\n  First 3 exchanges:")
+            for ex in qa_sample[:3]:
+                print(f"    [{ex['index']}] {ex['page_line']} examiner={ex.get('examiner','')}")
+                print(f"      Q: {ex['question'][:80]}")
+                print(f"      A: {ex['answer'][:80]}")
+        return False
+
+    print(f"  {PASS} — {stats['total_exchanges']} exchanges, "
+          f"{stats['total_objections']} objections, "
+          f"{stats['admissions_flagged']} admissions, "
+          f"{stats['evasion_instances']} evasions")
+    print(f"  {PASS} — Witness: {witness}")
+    print(f"  {PASS} — Timeline events: {stats['timeline_events']}, "
+          f"Exhibits: {stats['exhibits_referenced']}, "
+          f"Procedural markers: {stats['procedural_markers']}")
+    print(f"  {PASS} — Volume II exchanges found: {len(vol2_exchanges)}")
+
+    # Print timeline sample
+    timeline = data.get("timeline", [])
+    if timeline:
+        print(f"\n  Timeline sample (first 5 events):")
+        for ev in timeline[:5]:
+            print(f"    {ev['date_reference']} (exchange {ev['exchange']})")
+
+    # Print exhibit index
+    exhibits = data.get("exhibit_index", [])
+    if exhibits:
+        print(f"\n  Exhibits referenced: {[e['exhibit_id'] for e in exhibits]}")
+
+    # Print procedural markers
+    proc = data.get("procedural_markers", [])
+    if proc:
+        print(f"\n  Procedural markers:")
+        for p in proc[:5]:
+            print(f"    [{p['category']}] {p['text'][:80]}")
+
+    return True
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Test 6: New output fields on original sample
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def test_new_output_fields(tools: Tools) -> bool:
+    print(f"\n{BOLD}Test 6: new output fields (timeline, exhibits, key admissions){RESET}")
+
+    file_obj = {
+        "filename": "sample-deposition.txt",
+        "content": open(SAMPLE_TRANSCRIPT).read(),
+    }
+    result = await tools.analyze_transcript(
+        __files__=[file_obj],
+        __event_emitter__=mock_emitter,
+    )
+
+    try:
+        data = json.loads(result)
+    except json.JSONDecodeError as e:
+        print(f"  {FAIL} — invalid JSON: {e}")
+        return False
+
+    errors = []
+
+    # timeline should exist
+    if "timeline" not in data:
+        errors.append("'timeline' field missing from payload")
+    elif len(data["timeline"]) == 0:
+        errors.append("timeline is empty — transcript has many dates (2021, 2022, 2023)")
+
+    # exhibit_index should exist (transcript mentions Exhibits 1, 3, 7)
+    if "exhibit_index" not in data:
+        errors.append("'exhibit_index' field missing from payload")
+    elif len(data["exhibit_index"]) == 0:
+        errors.append("exhibit_index is empty — transcript references Plaintiff's Exhibit 3, 7")
+
+    # key_admission_index should exist
+    if "key_admission_index" not in data:
+        errors.append("'key_admission_index' field missing from payload")
+    elif len(data["key_admission_index"]) == 0:
+        errors.append("key_admission_index is empty")
+
+    # procedural_markers should exist
+    if "procedural_markers" not in data:
+        errors.append("'procedural_markers' field missing from payload")
+
+    # stats should include new counts
+    stats = data.get("stats", {})
+    for field in ("timeline_events", "exhibits_referenced", "procedural_markers"):
+        if field not in stats:
+            errors.append(f"stats.{field} missing")
+
+    if errors:
+        for e in errors:
+            print(f"  {FAIL} — {e}")
+        return False
+
+    print(f"  {PASS} — timeline: {len(data['timeline'])} events")
+    print(f"  {PASS} — exhibit_index: {[e['exhibit_id'] for e in data['exhibit_index']]}")
+    print(f"  {PASS} — key_admission_index: {len(data['key_admission_index'])} entries")
+    print(f"  {PASS} — procedural_markers: {len(data['procedural_markers'])} events")
+
+    # Show top admission
+    if data["key_admission_index"]:
+        top = data["key_admission_index"][0]
+        print(f"\n  Top key admission (exchange {top['exchange']}):")
+        print(f"    Q: {top['question'][:80]}")
+        print(f"    A: {top['answer'][:80]}")
+        print(f"    Note: {top.get('trial_prep_note','')}")
+
+    return True
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────────────────────────────────────
@@ -319,6 +500,8 @@ async def main():
     results.append(await test_generate_questions(tools))
     results.append(await test_prep_outline(tools))
     results.append(await test_edge_cases(tools))
+    results.append(await test_federal_format(tools))
+    results.append(await test_new_output_fields(tools))
 
     total = len(results)
     passed = sum(results)

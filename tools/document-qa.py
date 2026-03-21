@@ -1,16 +1,114 @@
 """
 title: Document Q&A
 author: local-ai-legal-setup
-version: 0.1.0
+version: 0.2.0
 license: MIT
-description: Upload a legal document (PDF, DOCX, TXT) and ask questions about it. Returns cited answers pinpointing the exact section and paragraph where the answer was found. Never fabricates — says "not found in document" when the answer is absent.
+description: Upload a legal document (PDF, DOCX, TXT) and ask questions about it. Returns cited answers pinpointing the exact section and paragraph where the answer was found. Never fabricates — says "not found in document" when the answer is absent. Uses hybrid BM25 + semantic retrieval (Ollama embeddings) when available — falls back to BM25 if no embedding model is installed.
 """
 
 import json
+import math
 import re
+import urllib.request
+import urllib.error
 from typing import Optional
 
 from pydantic import BaseModel
+
+
+# ── Embedding helpers (no external deps — pure stdlib) ──────────────────────
+
+def _get_embedding(text: str, model: str) -> Optional[list]:
+    """
+    Request an embedding vector from Ollama's local API.
+    Returns a list of floats, or None if the request fails (model not available,
+    Ollama not running, etc.). Caller should fall back to BM25 on None.
+    """
+    try:
+        payload = json.dumps({"model": model, "prompt": text}).encode()
+        req = urllib.request.Request(
+            "http://localhost:11434/api/embeddings",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+            return data.get("embedding")
+    except Exception:
+        return None
+
+
+def _cosine_similarity(a: list, b: list) -> float:
+    """Compute cosine similarity between two equal-length vectors."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _detect_embedding_model() -> Optional[str]:
+    """
+    Ask Ollama which embedding models are available.
+    Preference order: nomic-embed-text → qwen3-embedding → any *embed* model.
+    Returns None if Ollama isn't running or no embedding model is found.
+    """
+    try:
+        req = urllib.request.Request(
+            "http://localhost:11434/api/tags",
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+            models = [m["name"] for m in data.get("models", [])]
+
+        # Ranked preference
+        for preferred in ("nomic-embed-text", "qwen3-embedding:0.6b", "qwen3-embedding"):
+            for m in models:
+                if m.startswith(preferred):
+                    return m
+        # Any embed-named model as fallback
+        for m in models:
+            if "embed" in m.lower():
+                return m
+        return None
+    except Exception:
+        return None
+
+
+# ── Reciprocal Rank Fusion ──────────────────────────────────────────────────
+
+def _rrf_fuse(bm25_ranked: list, sem_ranked: list, k: int = 60) -> list:
+    """
+    Combine two ranked lists using Reciprocal Rank Fusion.
+    Each item gets score = 1/(k + rank) from each list; scores are summed.
+    Returns items sorted by fused score descending, with 'score' field updated.
+    """
+    scores: dict[int, float] = {}
+
+    for rank, chunk in enumerate(bm25_ranked, start=1):
+        idx = chunk["_idx"]
+        scores[idx] = scores.get(idx, 0.0) + 1.0 / (k + rank)
+
+    for rank, chunk in enumerate(sem_ranked, start=1):
+        idx = chunk["_idx"]
+        scores[idx] = scores.get(idx, 0.0) + 1.0 / (k + rank)
+
+    # Collect all chunks that appeared in either list
+    seen: dict[int, dict] = {}
+    for chunk in bm25_ranked + sem_ranked:
+        idx = chunk["_idx"]
+        if idx not in seen:
+            seen[idx] = chunk
+
+    fused = [
+        {**chunk, "score": scores[chunk["_idx"]]}
+        for chunk in seen.values()
+    ]
+    fused.sort(key=lambda x: x["score"], reverse=True)
+    return fused
 
 
 class Tools:
@@ -20,9 +118,16 @@ class Tools:
         max_chunks: int = 10  # base; auto-scales for large docs (see _retrieve)
         max_chunks_cap: int = 20  # hard upper bound regardless of doc size
         max_doc_chars: int = 200000
+        embedding_model: str = ""  # leave blank for auto-detect
+        semantic_weight: float = 0.5  # RRF balance (unused — RRF is rank-based)
 
     def __init__(self):
         self.valves = self.Valves()
+        # Per-instance embedding cache: chunk text → vector
+        # Populated once per document; cleared when a new doc is processed.
+        self._embed_cache: dict[str, list] = {}
+        self._embed_model: Optional[str] = None  # resolved at first embed call
+        self._embed_available: Optional[bool] = None  # None = not yet probed
 
     async def query_document(
         self,
@@ -36,6 +141,8 @@ class Tools:
         information was found.
 
         Upload a PDF, DOCX, or TXT file and then ask your question.
+        Uses hybrid BM25 + semantic search when an Ollama embedding model is
+        available — falls back to BM25-only if not.
 
         :param query: The question to answer based on the document.
         :return: Relevant document excerpts with section citations for the LLM to answer from.
@@ -96,12 +203,28 @@ class Tools:
         # Chunk and index
         chunks = self._chunk_document(text)
 
+        # Probe for embedding model once per instance
+        if self._embed_available is None:
+            model_override = self.valves.embedding_model.strip()
+            if model_override:
+                self._embed_model = model_override
+                probe = _get_embedding("test", self._embed_model)
+                self._embed_available = probe is not None
+            else:
+                self._embed_model = _detect_embedding_model()
+                self._embed_available = self._embed_model is not None
+
+        retrieval_mode = "hybrid" if self._embed_available else "BM25"
+
         if __event_emitter__:
             await __event_emitter__(
                 {
                     "type": "status",
                     "data": {
-                        "description": f"Searching {len(chunks)} sections for: {query[:60]}...",
+                        "description": (
+                            f"Searching {len(chunks)} sections "
+                            f"({retrieval_mode}) for: {query[:50]}..."
+                        ),
                         "done": False,
                     },
                 }
@@ -109,7 +232,6 @@ class Tools:
 
         # Scale max_chunks for large documents: proportional to chunk count,
         # floored at the base valve and capped at max_chunks_cap.
-        # A 100-page PDF may produce 200+ chunks; 10 is too few to cover it.
         scaled_max = max(
             self.valves.max_chunks,
             min(self.valves.max_chunks_cap, len(chunks) // 15),
@@ -148,7 +270,7 @@ class Tools:
                 {
                     "type": "status",
                     "data": {
-                        "description": f"Found {len(top_chunks)} relevant section(s)",
+                        "description": f"Found {len(top_chunks)} relevant section(s) [{retrieval_mode}]",
                         "done": True,
                     },
                 }
@@ -157,6 +279,8 @@ class Tools:
         output = {
             "document": filename,
             "query": query,
+            "retrieval_mode": retrieval_mode,
+            "embedding_model": self._embed_model if self._embed_available else None,
             "total_sections_searched": len(chunks),
             "relevant_sections_found": len(top_chunks),
             "answer_instruction": (
@@ -170,7 +294,7 @@ class Tools:
             "excerpts": [
                 {
                     "citation": chunk["citation"],
-                    "score": round(chunk["score"], 3),
+                    "score": round(chunk["score"], 4),
                     "text": chunk["text"],
                 }
                 for chunk in top_chunks
@@ -331,15 +455,13 @@ class Tools:
     def _chunk_document(self, text: str) -> list:
         """
         Split document into overlapping chunks, tracking section headers for citation.
-        Returns list of dicts: {text, citation, char_start, char_end}.
+        Returns list of dicts: {text, citation, char_start, char_end, _idx}.
+        _idx is a stable integer index used for RRF deduplication.
         """
         lines = text.splitlines()
         chunks = []
         current_section = "Document"
         paragraph_num = 0
-        current_chars = []
-        current_len = 0
-        chunk_start_line = 0
 
         def flush_chunk(lines_so_far: list, section: str, para_num: int):
             chunk_text = "\n".join(lines_so_far).strip()
@@ -350,6 +472,7 @@ class Tools:
                         "citation": f"{section}, paragraph {para_num}",
                         "section": section,
                         "paragraph": para_num,
+                        "_idx": len(chunks),
                     }
                 )
 
@@ -367,7 +490,6 @@ class Tools:
                     overlap_text = "\n".join(buffer_lines)
                     overlap_chars = len(overlap_text)
                     if overlap_chars > self.valves.overlap:
-                        # Keep last ~overlap chars worth of lines
                         overlap_lines = []
                         carried = 0
                         for bl in reversed(buffer_lines):
@@ -396,7 +518,6 @@ class Tools:
                 # Flush if buffer is large enough
                 if buffer_len >= self.valves.chunk_size:
                     flush_chunk(buffer_lines, current_section, paragraph_num)
-                    # Carry overlap
                     overlap_lines = []
                     carried = 0
                     for bl in reversed(buffer_lines):
@@ -477,6 +598,19 @@ class Tools:
 
     def _retrieve(self, query: str, chunks: list, top_k: int) -> list:
         """
+        Hybrid retrieval: BM25 keyword scores + semantic cosine similarity,
+        fused with Reciprocal Rank Fusion.
+
+        If no embedding model is available, falls back to pure BM25.
+        Results are cached — chunk embeddings are computed once per document.
+        """
+        if self._embed_available:
+            return self._retrieve_hybrid(query, chunks, top_k)
+        else:
+            return self._retrieve_bm25(query, chunks, top_k)
+
+    def _retrieve_bm25(self, query: str, chunks: list, top_k: int) -> list:
+        """
         BM25-style keyword retrieval. Scores each chunk by keyword overlap with
         the query, weighted by term frequency. No external dependencies.
         Returns top-k chunks sorted by score descending.
@@ -494,7 +628,6 @@ class Tools:
                     doc_freq[term] = doc_freq.get(term, 0) + 1
 
         n_docs = max(len(chunks), 1)
-        import math
 
         idf = {}
         for term in query_terms:
@@ -532,6 +665,58 @@ class Tools:
 
         scored.sort(key=lambda x: x["score"], reverse=True)
         return scored[:top_k]
+
+    def _retrieve_hybrid(self, query: str, chunks: list, top_k: int) -> list:
+        """
+        Hybrid retrieval using Reciprocal Rank Fusion over BM25 and semantic rankings.
+
+        BM25 rank captures: exact legal terms, section numbers, dollar amounts.
+        Semantic rank captures: conceptual queries ("bankruptcy" → "insolvency"),
+          legal synonyms ("terminate" ↔ "cancel", "breach" ↔ "default"), and
+          intent-level matches ("are we protected?" → indemnification clauses).
+
+        Chunk embeddings are cached in self._embed_cache keyed by chunk text.
+        The query is embedded fresh each call (queries are short — negligible cost).
+        """
+        # ── BM25 ranked list ──────────────────────────────────────────────────
+        bm25_scored = self._retrieve_bm25(query, chunks, len(chunks))
+        # For chunks with zero BM25 score, append them unscored so RRF can
+        # still promote them via their semantic rank.
+        bm25_seen = {c["_idx"] for c in bm25_scored}
+        bm25_ranked = bm25_scored + [
+            {**c, "score": 0.0} for c in chunks if c["_idx"] not in bm25_seen
+        ]
+
+        # ── Semantic ranked list ───────────────────────────────────────────────
+        query_vec = _get_embedding(query, self._embed_model)
+        if query_vec is None:
+            # Embedding call failed at query time — degrade to BM25
+            self._embed_available = False
+            return bm25_scored[:top_k]
+
+        # Embed each chunk (cached by text to avoid re-embedding on repeat queries)
+        sem_scored = []
+        for chunk in chunks:
+            text = chunk["text"]
+            if text not in self._embed_cache:
+                vec = _get_embedding(text, self._embed_model)
+                if vec is None:
+                    # Partial failure — skip semantic for this chunk
+                    continue
+                self._embed_cache[text] = vec
+            sim = _cosine_similarity(query_vec, self._embed_cache[text])
+            sem_scored.append({**chunk, "score": sim})
+
+        if not sem_scored:
+            # All embedding calls failed
+            self._embed_available = False
+            return bm25_scored[:top_k]
+
+        sem_scored.sort(key=lambda x: x["score"], reverse=True)
+
+        # ── RRF fusion ─────────────────────────────────────────────────────────
+        fused = _rrf_fuse(bm25_ranked, sem_scored, k=60)
+        return fused[:top_k]
 
     # Legal term families: query with any member matches documents containing any member.
     # This handles morphological variants BM25 would otherwise miss.

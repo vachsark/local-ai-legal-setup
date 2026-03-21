@@ -1,0 +1,698 @@
+                        1
+
+           UNITED STATES DISTRICT COURT
+           SOUTHERN DISTRICT OF NEW YORK
+
+   -----------------------------------x
+   ATLAS PHARMACEUTICALS, INC.,       :
+                                      :  Civil Action No.
+              Plaintiff,              :  23-CV-4821 (JSR)
+                                      :
+        -against-                     :
+                                      :
+   VANGUARD BIOTECH CORP. and         :
+   RICHARD L. CARMICHAEL,             :
+                                      :
+              Defendants.             :
+   -----------------------------------x
+
+             VIDEOTAPED DEPOSITION OF
+               PRIYA ANAND-MEHTA
+                 VOLUME I
+
+        Taken pursuant to Notice on behalf of
+        Defendants, at the offices of Perkins
+        Coie LLP, 1155 Avenue of the Americas,
+        New York, New York 10036
+
+        Date: November 8, 2023
+        Time: 9:07 a.m.
+
+   APPEARANCES:
+
+   For the Plaintiff:
+        NATHANIEL CROSS, ESQ.
+        SARAH BOUCHARD, ESQ.
+        Cross & Ferris LLP
+        55 Water Street, New York, NY
+
+   For the Defendants:
+        JAMES T. WHITMORE, ESQ.
+        ELEANOR PARK, ESQ.
+        Perkins Coie LLP
+
+   Court Reporter:  LINDA ORTEGA, RPR, CRR
+
+   Videographer:    KEVIN CHAN, CLVS
+
+                        2
+
+ 1     THE VIDEOGRAPHER:  We are now on the
+ 2  record.  This is the videotaped deposition
+ 3  of Priya Anand-Mehta taken in the matter of
+ 4  Atlas Pharmaceuticals versus Vanguard Biotech
+ 5  Corp.  Today's date is November 8, 2023.
+ 6  The time is 9:07 a.m.
+ 7     (Exhibit 1, Notice of Deposition,
+ 8  was marked for identification.)
+ 9     THE WITNESS:  I understand.
+10     MR. WHITMORE:  Counsel, are we ready?
+11     MR. CROSS:  Ready.
+12
+13              EXAMINATION
+14
+15  BY MR. WHITMORE:
+16
+17  Q.  Good morning, Ms. Anand-Mehta.  Please
+18  state your full name for the record.
+19
+20  A.  Priya Anand-Mehta.
+21
+22  Q.  And your current position?
+23
+24  A.  I am the Senior Vice President of
+25  Research and Development at Atlas
+
+                        3
+
+ 1  Pharmaceuticals.
+ 2
+ 3  Q.  How long have you held that position?
+ 4
+ 5  A.  Since January of 2019.  A little over
+ 6  four years now.
+ 7
+ 8  Q.  Before joining Atlas, where were you
+ 9  employed?
+10
+11  A.  I was at Vanguard Biotech for
+12  approximately seven years, from 2012 to
+13  2019.
+14
+15  Q.  And what was your role at Vanguard?
+16
+17  A.  I was Director of Molecular Research.
+18  I reported directly to Dr. Carmichael.
+19
+20  Q.  Dr. Carmichael is the individual
+21  defendant in this action, correct?
+22
+23  A.  Yes, that's correct.
+24
+25  Q.  Ms. Anand-Mehta, are you familiar
+
+                        4
+
+ 1  with the compound designated VG-7741?
+ 2
+ 3  A.  Yes, I am.
+ 4
+ 5  Q.  What is VG-7741?
+ 6
+ 7  A.  It is a targeted kinase inhibitor that
+ 8  was developed at Vanguard during my tenure.
+ 9  It was one of our lead oncology candidates.
+10
+10  Q.  Were you personally involved in the
+11  development of VG-7741?
+12
+13  A.  I was the principal investigator on
+14  the project from 2015 through the end of
+15  2018.
+16
+17  Q.  Did you take any documents, data, or
+18  research materials related to VG-7741 when
+19  you left Vanguard in January 2019?
+20
+21     MR. CROSS:  Objection.  Vague and
+22  ambiguous.
+23
+24  A.  I took only my personal property.
+25  Nothing proprietary.
+
+                        5
+
+ 1  Q.  Let me be more specific.  Did you
+ 2  take any laboratory notebooks or research
+ 3  logs related to VG-7741?
+ 4
+ 5  A.  No, I did not.
+ 6
+ 7  Q.  Did you take any electronic files
+ 8  related to VG-7741?
+ 9
+10     MR. CROSS:  Same objection.
+11
+12  A.  No.
+13
+14  Q.  I'm going to show you what has been
+15  marked as Defendants' Exhibit 3.  Do you
+16  recognize this document?
+17
+18  A.  Let me look at it.  Yes, I see what
+19  this is.  This appears to be a file access
+20  log from Vanguard's document management
+21  system.
+22
+23  Q.  Does that log show your user ID
+24  accessing the VG-7741 research folder on
+25  December 28, 2018?
+
+                        6
+
+ 1  A.  It shows an access event associated
+ 2  with my credentials, yes.
+ 3
+ 4  Q.  And that was four days before you
+ 5  resigned from Vanguard?
+ 6
+ 7  A.  My resignation letter was dated
+ 8  January 2nd, yes.
+ 9
+10  Q.  So four days before you resigned,
+11  your credentials accessed this folder.
+12  How do you explain that?
+13
+14     MR. CROSS:  Objection.  Argumentative.
+15
+15  A.  I regularly accessed my own research
+16  files as part of my job duties.  I was
+17  still employed at that time.
+18
+19  Q.  Did you download any files during
+20  that December 28th access session?
+21
+22  A.  I don't recall the specific access.
+23  I accessed research files regularly.
+24
+25  (Discussion off the record.)
+
+                        7
+
+ 1  BY MR. WHITMORE:
+ 2
+ 3  Q.  We're back on the record.
+ 4  Ms. Anand-Mehta, prior to the break, you
+ 5  testified that you did not take any
+ 6  electronic files related to VG-7741.
+ 7  I want to direct your attention to
+ 8  Exhibit 4.  Is that your personal
+ 9  email address listed in the "To" field?
+10
+11  A.  Yes, that is my personal Gmail
+12  address.
+13
+14  Q.  And the "From" field shows your
+15  Vanguard email address, correct?
+16
+17  A.  Yes.
+18
+19  Q.  The attachment on that email is
+20  named "VG7741-synthesis-protocol-FINAL.pdf."
+21  Did you send that file to yourself?
+22
+23     MR. CROSS:  Objection.  Foundation.
+24  You haven't established she sent it.
+25
+
+                        8
+
+ 1  A.  I -- I may have sent certain
+ 2  documents to myself for -- for review
+ 3  purposes.  I don't specifically recall
+ 4  this one.
+ 5
+ 6  Q.  This email is dated December 30,
+ 7  2018 -- two days before your resignation.
+ 8  Is that consistent with what you'd expect?
+ 9
+10  A.  I don't know what to say.  If that
+11  document shows my email address, I accept
+12  that it may be authentic.
+13
+14  Q.  Did you use the synthesis protocol
+15  described in VG7741-synthesis-protocol-FINAL
+16  in your work at Atlas Pharmaceuticals?
+17
+18     MR. CROSS:  Objection.  Calls for a
+19  legal conclusion.
+20
+21  A.  Atlas developed its compound
+22  AP-1100 through independent research.
+23  I cannot speak to whether any similarities
+24  exist.
+25
+
+                        9
+
+ 1  (Exhibit 5, Atlas internal research log,
+ 2  pages 1-48, was marked for identification.)
+ 3
+ 4  Q.  I'm showing you Exhibit 5, which are
+ 5  internal research logs from Atlas bearing
+ 6  your name as principal investigator.
+ 7  Please take a moment to review pages 12
+ 8  through 15.
+ 9
+10  A.  I have reviewed them.
+11
+12  Q.  Does the synthesis pathway described
+13  on page 13 match the pathway in the
+14  Vanguard document you just saw?
+15
+16     MR. CROSS:  Objection.  Calls for
+17  expert testimony.  She's not being
+18  offered as an expert.
+19
+20  A.  The general approach is similar.
+21  Many kinase inhibitor programs use
+22  comparable methodologies.
+23
+24  Q.  But you designed the Atlas pathway?
+25
+
+                       10
+
+ 1  A.  I contributed to it, yes.
+ 2
+ 3  Q.  And you designed the Vanguard
+ 4  pathway?
+ 5
+ 6  A.  I was principal investigator, so
+ 7  yes, I directed that work.
+ 8
+ 9  Q.  Let's talk about the date of
+10  May 15, 2019.  Do you recall a meeting
+11  with Dr. Carmichael that day?
+12
+13  A.  That was several years ago.  I don't
+14  recall the specifics of every meeting.
+15
+16  Q.  I'll show you what has been marked
+17  as Exhibit 6.  This is a calendar
+18  invitation from Dr. Carmichael to you
+19  dated May 15, 2019, Subject: "VG-7741
+20  IP Discussion."  Does this refresh your
+21  recollection?
+22
+23  A.  If I received that invitation I
+24  would have seen it.  But I don't recall
+25  a meeting specifically about IP.
+
+                       11
+
+ 1  Q.  Did you have any discussions with
+ 2  Dr. Carmichael after leaving Vanguard
+ 3  about the VG-7741 compound?
+ 4
+ 5  A.  I may have spoken with him about
+ 6  industry matters generally.
+ 7
+ 8  Q.  I'm going to read you a portion of
+ 9  Dr. Carmichael's deposition testimony,
+10  taken October 4, 2023, at page 187,
+11  line 12.  He testified, quote: "Priya
+12  told me directly in our May meeting
+13  that Atlas had licensed technology
+14  related to VG-7741."  Did you tell
+15  Dr. Carmichael that?
+16
+17     MR. CROSS:  Objection.  Hearsay.
+18  That's Carmichael's account, not this
+19  witness's.  She can't authenticate what
+20  he said.
+21
+22  A.  That's not accurate.  I did not
+23  tell him that.  Atlas did not license
+24  anything from Vanguard.
+25
+
+                       12
+
+ 1  (Whereupon, a recess was taken.)
+ 2
+ 3  BY MR. WHITMORE:
+ 4
+ 5  Q.  We're back on the record at 10:45.
+ 6  Ms. Anand-Mehta, I want to ask you about
+ 7  the Atlas compound AP-1100.  When did
+ 8  Atlas first file a patent application
+ 9  covering AP-1100?
+10
+11  A.  I believe the initial provisional
+12  application was filed in September 2019.
+13
+14  Q.  And what was the priority date
+15  claimed in that application?
+16
+17     MR. CROSS:  Objection.  Calls for
+18  legal conclusion.
+19
+20  A.  I'm not a patent attorney.  I would
+21  need to review the specific application
+22  to answer accurately.
+23
+24  Q.  Were you involved in the preparation
+25  of the patent application?
+
+                       13
+
+ 1  A.  I provided technical information
+ 2  to the patent counsel, yes.
+ 3
+ 4  Q.  Did anyone ask you whether the
+ 5  compound data you provided was developed
+ 6  entirely within Atlas?
+ 7
+ 8  A.  I believe standard representations
+ 9  are made in the patent process, yes.
+10
+11  Q.  Did you represent to Atlas's patent
+12  counsel that the AP-1100 synthesis data
+13  was independently developed?
+14
+15  A.  I represented what I understood to
+16  be true.
+17
+18  Q.  And what did you understand to be
+19  true?
+20
+21  A.  That our research at Atlas was
+22  conducted independently.
+23
+24  Q.  Even though you sent the Vanguard
+25  synthesis protocol to yourself two days
+
+                       14
+
+ 1  before your resignation?
+ 2
+ 3     MR. CROSS:  Objection.
+ 4  Argumentative.  Assumes facts.
+ 5
+ 6  A.  I've already addressed the email.
+ 7  I don't know that I actually reviewed
+ 8  that document in connection with Atlas
+ 9  work.
+10
+11  Q.  You don't know?
+12
+13  A.  No, I do not know with certainty.
+14
+15  Q.  Earlier you said -- and I'm reading
+16  from your answer at page 8, lines 1-4 --
+17  "I may have sent certain documents to
+18  myself for review purposes."  What review
+19  purposes did you have in mind for the
+20  VG-7741 synthesis protocol two days
+21  before resigning?
+22
+23     MR. CROSS:  Objection.  Compound.
+24  Argumentative.
+25
+
+                       15
+
+ 1  A.  At that time I was wrapping up my
+ 2  work at Vanguard.  I may have been
+ 3  reviewing files to ensure my own work
+ 4  was complete.
+ 5
+ 6  Q.  But you testified moments ago that
+ 7  you did not take any electronic files
+ 8  related to VG-7741.  How do you reconcile
+ 9  those two statements?
+10
+11     MR. CROSS:  Objection.
+12  Mischaracterizes the testimony.
+13
+14  A.  I said I didn't take proprietary
+15  files.  I'm not certain that email
+16  constitutes taking in the legal sense.
+17
+18  (Videotape stopped.  Lunch recess taken
+19  from 12:03 p.m. to 1:15 p.m.)
+20
+20  BY MR. WHITMORE:
+21
+22  Q.  Back on the record after lunch.
+23  Ms. Anand-Mehta, let me direct your
+24  attention to the development timeline.
+25  When did Atlas begin clinical trials
+
+                       16
+
+ 1  on AP-1100?
+ 2
+ 3  A.  Phase I trials began in March 2021.
+ 4
+ 5  Q.  And when was the IND application
+ 6  filed?
+ 7
+ 8  A.  I believe in August 2020.
+ 9
+10  Q.  The IND was filed in August 2020,
+11  only 19 months after you joined Atlas
+12  with seven years of VG-7741 research
+13  background.  Is that timeline consistent
+14  with what you'd expect for a fully
+15  independent program?
+16
+17     MR. CROSS:  Objection.  Calls for
+18  speculation.  Argumentative.
+19
+20  A.  Drug development timelines vary
+21  considerably.  It's not unusual to move
+22  quickly when you have experienced
+23  researchers and strong foundational data.
+24
+25  Q.  Strong foundational data from where?
+
+                       17
+
+ 1  A.  From Atlas's own research program.
+ 2
+ 3  Q.  Ms. Anand-Mehta, I have no further
+ 4  questions at this time.  I'll reserve
+ 5  the right to recall pending document
+ 6  production.
+ 7
+ 8     MR. CROSS:  We'll go on redirect.
+ 9
+10              EXAMINATION
+11
+12  BY MR. CROSS:
+13
+14  Q.  Ms. Anand-Mehta, Mr. Whitmore asked
+15  you about a December 28, 2018 access
+16  event.  Was it common practice at Vanguard
+17  for researchers to access their own project
+18  files before year-end?
+19
+20  A.  Yes.  We routinely reviewed files
+21  for year-end reporting and to ensure
+22  lab notebooks were current.
+23
+24  Q.  And was the VG-7741 project your
+25  project at that time?
+
+                       18
+
+ 1  A.  It was one of my primary projects,
+ 2  yes.
+ 3
+ 4  Q.  Regarding the email to yourself --
+ 5  did Atlas's patent counsel review any
+ 6  documents you sent to yourself?
+ 7
+ 8  A.  Not to my knowledge.
+ 9
+10  Q.  And do you understand whether Atlas's
+11  AP-1100 pathway differs in any material
+12  respect from the VG-7741 pathway?
+13
+14  A.  From a scientific standpoint, yes.
+15  They differ in the selectivity profile
+16  and the synthetic route at step 4.
+17
+18     MR. WHITMORE:  Objection.  Leading.
+19
+20  A.  That's my scientific understanding.
+21
+22     MR. CROSS:  Nothing further.
+23
+24     MR. WHITMORE:  No recross.
+25
+
+                       19
+
+ 1     (Deposition concluded at 1:47 p.m.)
+ 2
+ 3
+ 4
+ 5        I, PRIYA ANAND-MEHTA, do hereby
+ 6     certify that I have read the foregoing
+ 7     transcript of my deposition taken on
+ 8     November 8, 2023, and that it is true
+ 9     and accurate to the best of my knowledge.
+10
+11
+12     _________________________________
+13     PRIYA ANAND-MEHTA
+14
+15     Subscribed and sworn to before me
+16     this _____ day of __________, 2023.
+17
+18
+19     _________________________________
+20     Notary Public
+21
+22
+23  CERTIFICATE OF REPORTER
+24
+25     I, LINDA ORTEGA, Registered Professional
+
+                       20
+
+ 1  Reporter and Certified Realtime Reporter,
+ 2  do hereby certify that the foregoing is a
+ 3  true and accurate transcript of the
+ 4  proceedings taken in the above-entitled
+ 5  matter.
+ 6
+ 7
+ 8     _________________________________
+ 9     LINDA ORTEGA, RPR, CRR
+10
+
+                VOLUME II
+
+                       21
+
+ 1     (Volume II — Continuation, same date)
+ 2
+ 3     THE VIDEOGRAPHER:  Back on the record.
+ 4     This is Volume II of the deposition of
+ 5     Priya Anand-Mehta.  The time is 2:10 p.m.
+ 6
+ 7     MR. WHITMORE:  We have some additional
+ 8     documents that arrived during the lunch
+ 9     break.  We'd like to continue.
+10
+11     MR. CROSS:  Noted.
+12
+13  BY MR. WHITMORE:
+14
+15  Q.  Ms. Anand-Mehta, during the lunch
+16  break, we received supplemental documents
+17  from Atlas's production.  I want to show
+18  you what we've marked as Exhibit 12.
+19  This is an email chain between you and
+20  Dr. Raymond Park at Atlas dated
+21  February 14, 2019.  Do you recognize it?
+22
+23  A.  Yes, I believe I recall this
+24  correspondence.
+25
+
+                       22
+
+ 1  Q.  In your email at the bottom of
+ 2  page 1, you write -- and I'll quote
+ 3  directly -- "Ray, I have the full
+ 4  synthesis data from my Vanguard work.
+ 5  We can use it to accelerate the
+ 6  platform."  Did you write that?
+ 7
+ 8  A.  Let me read the entire context.
+ 9  I see the words, but the meaning -- I
+10  was referring to my general expertise,
+11  my scientific knowledge, not physical
+12  documents.
+13
+14  Q.  The email says "synthesis data,"
+15  not "expertise."  You would agree that
+16  "data" and "expertise" are different
+17  things?
+18
+19     MR. CROSS:  Objection.  Argumentative.
+20
+20  A.  They can be.  In context, I meant
+21  my knowledge and experience.
+22
+23  Q.  Exhibit 13 is a document produced
+24  by Atlas titled "AP-1100 Project
+25  Initialization Report" dated
+
+                       23
+
+ 1  March 1, 2019.  It lists as a source
+ 2  document: "Anand-Mehta prior synthesis
+ 3  records."  Did you provide such records?
+ 4
+ 5     MR. CROSS:  Objection.  Foundation.
+ 6  The document was created by someone
+ 7  else.
+ 8
+ 9  A.  I'm not sure I understand what that
+10  entry refers to.  I provided my
+11  scientific expertise.  Whether someone
+12  documented it as "records" is not
+13  something I controlled.
+14
+15  Q.  But you did provide something --
+16  some materials -- that the project lead
+17  described as "prior synthesis records"?
+18
+19  A.  I cannot speak to what someone else
+20  wrote in a report.
+21
+22  Q.  Ms. Anand-Mehta, is it your
+23  testimony that you have no idea why
+24  the Atlas project initialization report
+25  would reference your "prior synthesis
+
+                       24
+
+ 1  records" unless you provided them?
+ 2
+ 3     MR. CROSS:  Objection.  Compound.
+ 4  Argumentative.  Asked and answered.
+ 5
+ 6  A.  I cannot explain what someone else
+ 7  wrote.
+ 8
+ 9  Q.  Did you retain any copies of
+10  Vanguard research materials after
+11  January 2, 2019?
+12
+13  A.  No.
+14
+15  Q.  Are you certain of that?
+16
+17  A.  To the best of my recollection,
+18  yes.
+19
+20  Q.  Even in light of the email we
+21  just discussed?
+22
+23     MR. CROSS:  Objection.
+24
+24  A.  I've explained my understanding of
+25  that email.
+
+                       25
+
+ 1  Q.  I have nothing further.  Thank you,
+ 2  Ms. Anand-Mehta.
+ 3
+ 4     MR. CROSS:  Nothing from Plaintiff.
+ 5
+ 6     (Deposition concluded at 2:51 p.m.)
+ 7
+ 8
+
+   THE INTERPRETER: [This portion translated
+   from Mandarin — witness confirmed understanding
+   of oath in native language prior to commencement.]
+
