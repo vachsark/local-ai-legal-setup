@@ -107,6 +107,7 @@ legal-check --summarize deposition.txt
 legal-check -m contract clause.txt     # Contract-focused review
 legal-check -m email draft-email.txt   # Quick email polish
 legal-check -m plain dense-clause.txt  # Rewrite in plain English
+legal-check -m saulm agreement.txt     # SaulLM specialist legal model (30B legal tokens)
 ```
 
 > **What does `-m` mean?** The `-m` flag means "model" — it selects a specialized AI tuned for that type of work (contracts, emails, plain language, etc.).

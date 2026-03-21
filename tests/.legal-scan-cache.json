@@ -1,0 +1,221 @@
+[
+  {
+    "doc": "grammar-sft-system-prompt.txt",
+    "risk_level": "LOW",
+    "signals": [
+      {
+        "label": "Mixed 'shall'/'will' usage",
+        "severity": "LOW",
+        "hint": "Adams (MSCD): mixing shall/will in same document creates ambiguity about obligation vs. futurity; pick one and be consistent",
+        "excerpt": "ffect. VOCABULARY: Never correct terms of art. Modal verbs: shall=obligation, may=discretion, must=condition, will=future. DEFINED TERMS: Consistent capitalization. Flag undefined, unused, or inconsistent defined terms. CITATIONS: Nev"
+      }
+    ],
+    "parties": [],
+    "_hash": "fa0134d62dbca3cf"
+  },
+  {
+    "doc": "grammar-training-system-prompt.txt",
+    "risk_level": "MEDIUM",
+    "signals": [
+      {
+        "label": "Best efforts standard",
+        "severity": "MEDIUM",
+        "hint": "Ken Adams (MSCD): 'best efforts' is ambiguous \u2014 courts split on whether it differs from 'reasonable efforts'",
+        "excerpt": "n would help - Flag inconsistent efforts standards (mixing \"best efforts\" and \"reasonable efforts\") - Flag ambiguous scope modifiers - Flag \"represents and warrants\" without differentiating re"
+      },
+      {
+        "label": "Non-exhaustive 'including' (ejusdem generis risk)",
+        "severity": "LOW",
+        "hint": "Adams: 'including' without 'but not limited to' may invite ejusdem generis narrowing; use 'including but not limited to' or tabulate",
+        "excerpt": "text  CONTRACT-SPECIFIC (when reviewing contracts): - Flag \"including\" without \"without limitation\" - Flag undefined subjective terms (\"material\", \"reasonable\") where quantification would h"
+      },
+      {
+        "label": "Mixed 'shall'/'will' usage",
+        "severity": "LOW",
+        "hint": "Adams (MSCD): mixing shall/will in same document creates ambiguity about obligation vs. futurity; pick one and be consistent",
+        "excerpt": "g non-standard usage of legal terms - Modal verb precision: shall=obligation, may=discretion, must=condition, will=future - Flag \"shall\" used for non-obligations (conditions, declarations, future events)  DEFINED TERMS: - Consistent c"
+      }
+    ],
+    "parties": [],
+    "_hash": "ceb518c69d180e0e"
+  },
+  {
+    "doc": "sample-9th-circuit-brief.txt",
+    "risk_level": "MEDIUM",
+    "signals": [
+      {
+        "label": "Exclusivity provision",
+        "severity": "MEDIUM",
+        "hint": "Exclusive relationship \u2014 may lock out other vendors/clients",
+        "excerpt": "). Under the Agreement, Global Tech was required to provide exclusive access to its proprietary software platform and to maintain service availability of at least 99.5%.  Global Tech repeat"
+      }
+    ],
+    "parties": [],
+    "_hash": "fc242ade3cbeb1a7"
+  },
+  {
+    "doc": "sample-contract.txt",
+    "risk_level": "HIGH",
+    "signals": [
+      {
+        "label": "Indemnification without apparent cap",
+        "severity": "HIGH",
+        "hint": "Indemnification clause present but no cap/limit detected nearby",
+        "excerpt": "on full payment of all fees associated with such work.   6. INDEMNIFICATION  6.1 Company Indemnification. Company shall indemnify, defend, and hold harmless Client and its officers, directors, em"
+      },
+      {
+        "label": "Indemnification clause",
+        "severity": "MEDIUM",
+        "hint": "Indemnification present \u2014 verify if a cap applies",
+        "excerpt": "ayment), 5 (Confidentiality), 6 (Intellectual Property), 7 (Indemnification), 8 (Limitation of Liability), and 9 (General) shall survive termination or expiration of this Agreement.   3. FEES AND"
+      },
+      {
+        "label": "Auto-renewal provision",
+        "severity": "HIGH",
+        "hint": "Contract auto-renews \u2014 check notice period to cancel",
+        "excerpt": "nce with this Section 2.  2.2 Renewal. This Agreement shall automatically renew for successive one (1) year periods (each, a \"Renewal Term,\" and together with the Initial Term, the \"Term\") unless eit"
+      },
+      {
+        "label": "Unilateral termination (without cause)",
+        "severity": "HIGH",
+        "hint": "Either party can terminate without cause \u2014 check for asymmetry",
+        "excerpt": "onable detail.  2.4 Termination for Convenience. Client may terminate this Agreement for any reason upon ninety (90) days' prior written notice to Company. Company may terminate this Agreement for convenience upon one h"
+      },
+      {
+        "label": "Mandatory arbitration",
+        "severity": "MEDIUM",
+        "hint": "Disputes must go to arbitration \u2014 waives right to jury trial in court",
+        "excerpt": "g out of or relating to this Agreement shall be resolved by binding arbitration administered by JAMS under its Commercial Arbitration Rules. The arbitration shall take place in San Francisco, Califor"
+      },
+      {
+        "label": "Jury / class action waiver",
+        "severity": "HIGH",
+        "hint": "Explicit waiver of jury trial or class action rights",
+        "excerpt": "entered in any court of competent jurisdiction. EACH PARTY WAIVES ITS RIGHT TO A JURY TRIAL.  9.3 Notices. All notices must be in writing and delivered by: (a) personal delivery; (b) certified mail, return"
+      },
+      {
+        "label": "Non-compete clause",
+        "severity": "HIGH",
+        "hint": "Restricts future business activity \u2014 verify scope and duration",
+        "excerpt": "s arising from gross negligence or willful misconduct.   8. NON-COMPETE AND NON-SOLICITATION  8.1 Non-Solicitation. During the Term and for a period of twelve (12) months following terminatio"
+      },
+      {
+        "label": "Non-solicitation clause",
+        "severity": "MEDIUM",
+        "hint": "Restricts hiring or poaching of employees/clients",
+        "excerpt": "ross negligence or willful misconduct.   8. NON-COMPETE AND NON-SOLICITATION  8.1 Non-Solicitation. During the Term and for a period of twelve (12) months following termination of this Agreement,"
+      },
+      {
+        "label": "Assignment provision",
+        "severity": "LOW",
+        "hint": "Assignment clause present \u2014 check consent requirements",
+        "excerpt": "ng provisions shall continue in full force and effect.  9.9 Assignment. Neither Party may assign this Agreement without the prior written consent of the other Party, except that Company may"
+      },
+      {
+        "label": "Force majeure clause",
+        "severity": "LOW",
+        "hint": "Excuses performance for unforeseeable events \u2014 check breadth",
+        "excerpt": "overnight courier. Notices are effective upon receipt.  9.4 Force Majeure. Neither Party shall be liable for any failure or delay in performance due to causes beyond its reasonable control, inc"
+      },
+      {
+        "label": "Confidentiality obligation",
+        "severity": "LOW",
+        "hint": "Confidentiality obligations present \u2014 check duration and scope",
+        "excerpt": "such data.  2.6 Survival. Sections 3 (Fees and Payment), 5 (Confidentiality), 6 (Intellectual Property), 7 (Indemnification), 8 (Limitation of Liability), and 9 (General) shall survive terminatio"
+      },
+      {
+        "label": "Choice of law / governing law",
+        "severity": "LOW",
+        "hint": "Which jurisdiction's law controls \u2014 may require local counsel",
+        "excerpt": "es that may compete with the other Party.   9. GENERAL  9.1 Governing Law. This Agreement shall be governed by and construed in accordance with the laws of the State of Delaware, without regard"
+      },
+      {
+        "label": "Survival clause",
+        "severity": "LOW",
+        "hint": "Some obligations survive contract end \u2014 check which ones",
+        "excerpt": "termination, after which Company may delete such data.  2.6 Survival. Sections 3 (Fees and Payment), 5 (Confidentiality), 6 (Intellectual Property), 7 (Indemnification), 8 (Limitation of L"
+      },
+      {
+        "label": "Exclusivity provision",
+        "severity": "MEDIUM",
+        "hint": "Exclusive relationship \u2014 may lock out other vendors/clients",
+        "excerpt": "ore the start of the Renewal Term.  3.5 Taxes. All fees are exclusive of applicable taxes. Client is responsible for all sales, use, or similar taxes, excluding taxes based on Company's net"
+      },
+      {
+        "label": "Commercially reasonable efforts standard",
+        "severity": "LOW",
+        "hint": "Common standard \u2014 but courts interpret it differently; consider defining in contract",
+        "excerpt": "ely, the \"Services\").  1.2 Service Level. Company shall use commercially reasonable efforts to ensure the Platform is available 99.5% of the time in any given calendar month, excluding scheduled maintenance wind"
+      },
+      {
+        "label": "Non-exhaustive 'including' (ejusdem generis risk)",
+        "severity": "LOW",
+        "hint": "Adams: 'including' without 'but not limited to' may invite ejusdem generis narrowing; use 'including but not limited to' or tabulate",
+        "excerpt": "inst any third-party claims, damages, losses, and expenses (including reasonable attorneys' fees) arising out of or relating to: (a) Company's infringement of any third-party intellectual p"
+      },
+      {
+        "label": "IP ownership / work-for-hire",
+        "severity": "MEDIUM",
+        "hint": "Verify IP ownership is clearly assigned; work-for-hire must meet statutory requirements",
+        "excerpt": "val. Sections 3 (Fees and Payment), 5 (Confidentiality), 6 (Intellectual Property), 7 (Indemnification), 8 (Limitation of Liability), and 9 (General) shall survive termination or expiration of this Agr"
+      },
+      {
+        "label": "Liability cap / limitation of liability clause",
+        "severity": "LOW",
+        "hint": "Liability ceiling present \u2014 check amount, exclusions (fraud, willful misconduct), and mutual vs. one-sided",
+        "excerpt": "iality), 6 (Intellectual Property), 7 (Indemnification), 8 (Limitation of Liability), and 9 (General) shall survive termination or expiration of this Agreement.   3. FEES AND PAYMENT  3.1 License Fee. Cl"
+      },
+      {
+        "label": "Consequential/indirect damages exclusion or waiver",
+        "severity": "HIGH",
+        "hint": "Waiving consequential damages can eliminate most real-world losses \u2014 verify scope and exceptions",
+        "excerpt": "ten consent.   7. LIMITATION OF LIABILITY  7.1 Exclusion of Consequential Damages. IN NO EVENT SHALL EITHER PARTY BE LIABLE TO THE OTHER FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY,"
+      }
+    ],
+    "parties": [],
+    "_hash": "41457cf708a6dd8d"
+  },
+  {
+    "doc": "sample-deposition-federal.txt",
+    "risk_level": "LOW",
+    "signals": [],
+    "parties": [],
+    "_hash": "722318ba07a421f9"
+  },
+  {
+    "doc": "sample-deposition.txt",
+    "risk_level": "LOW",
+    "signals": [],
+    "parties": [],
+    "_hash": "7ad1b4309f40728a"
+  },
+  {
+    "doc": "sample-sdny-motion.txt",
+    "risk_level": "LOW",
+    "signals": [
+      {
+        "label": "Force majeure clause",
+        "severity": "LOW",
+        "hint": "Excuses performance for unforeseeable events \u2014 check breadth",
+        "excerpt": "tate in lower Manhattan. The agreement contained an express force majeure clause that excused Northstar's performance obligations \"in the event of any circumstances beyond Northstar's reasonabl"
+      },
+      {
+        "label": "Non-exhaustive 'including' (ejusdem generis risk)",
+        "severity": "LOW",
+        "hint": "Adams: 'including' without 'but not limited to' may invite ejusdem generis narrowing; use 'including but not limited to' or tabulate",
+        "excerpt": "of any circumstances beyond Northstar's reasonable control, including but not limited to market disruptions, regulatory changes, or adverse economic conditions.\" Compl. \u00b6 12.  In October 20"
+      }
+    ],
+    "parties": [
+      {
+        "name": "Defendant Northstar Capital Group Inc.",
+        "role": "Northstar"
+      },
+      {
+        "name": "Plaintiff Meridian Partners LLC",
+        "role": "Meridian"
+      }
+    ],
+    "_hash": "5ba243264a048f5f"
+  }
+]

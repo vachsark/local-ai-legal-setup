@@ -7,6 +7,7 @@
 #   legal-check -m brief motion.txt         # Use brief-reviewer model
 #   legal-check -m contract agreement.txt   # Use contract-language model
 #   legal-check -m plain clause.txt         # Use plain-language translator
+#   legal-check -m saulm contract.txt       # Use SaulLM (specialist legal model)
 #   legal-check -c                          # Check clipboard contents
 #   legal-check -c -m email                 # Check clipboard with specific model
 #   legal-check -d contract.pdf "What is the indemnification cap?"
@@ -16,6 +17,7 @@
 #   legal-check -b contracts/ -o report.md  # Batch scan, write report to file
 #   legal-check -b contracts/ --batch-mode privilege  # Privilege review mode
 #   legal-check -b contracts/ --batch-focus "indemnification,auto-renewal"
+#   legal-check -b contracts/ --batch-mode query --batch-focus "uncapped indemnification"
 
 set -euo pipefail
 
@@ -27,6 +29,7 @@ declare -A MODELS=(
     [contract]="contract-language"
     [plain]="plain-language"
     [ft]="legalgrammar"
+    [saulm]="saulm-legal"
 )
 
 MODEL_KEY="grammar"
@@ -66,6 +69,7 @@ OPTIONS:
                brief     Court filing proofreader (qwen3.5:9b)
                contract  Contract precision & ambiguity (qwen3.5:9b)
                plain     Plain-language rewrite (gemma3:12b)
+               saulm     SaulLM specialist legal model (trained on 30B legal tokens)
                rules     Court filing format checker (no AI model — instant)
   --jurisdiction KEY  Jurisdiction for rules mode (e.g., 9th-circuit, cal-superior)
   --list-jurisdictions  List all supported court jurisdictions and exit
@@ -81,9 +85,11 @@ OPTIONS:
   --interactive FILE Long form of -i
   -b DIR     Batch scan a folder of contracts (.txt, .pdf, .docx)
   --batch DIR        Long form of -b
-  --batch-mode MODE  Batch mode: risk (default), privilege, terms
-  --batch-focus TERMS  Comma-separated focus terms for risk mode
+  --batch-mode MODE  Batch mode: risk (default), privilege, terms, query
+                       query — search cached results for --batch-focus terms across all docs
+  --batch-focus TERMS  Comma-separated focus terms
                        e.g. "indemnification,auto-renewal,termination"
+                       Required for --batch-mode query
   -o FILE    Output file for batch report (default: print to stdout)
   -h         Show this help
 
@@ -94,6 +100,7 @@ EXAMPLES:
   cat clause.txt | legal-check -m contract            # Contract precision check
   legal-check -c -m email                             # Check clipboard email
   legal-check -m plain lease-section.txt              # Plain-language rewrite
+  legal-check -m saulm agreement.txt                 # SaulLM specialist contract review
   legal-check -d contract.pdf "What is the indemnification cap?"
   legal-check -d deposition.txt "Summarize the key admissions"
   legal-check -s contract.pdf                        # Summarize a document
@@ -103,6 +110,7 @@ EXAMPLES:
   legal-check -b discovery/ --batch-mode privilege   # Privilege review
   legal-check -b contracts/ --batch-mode terms       # Key terms extraction
   legal-check -b contracts/ --batch-focus "indemnification,auto-renewal"
+  legal-check -b contracts/ --batch-mode query --batch-focus "uncapped indemnification"
   legal-check -m rules --jurisdiction 9th-circuit brief.txt   # Filing format check
   legal-check -m rules --jurisdiction cal-superior motion.txt
   legal-check -m rules --jurisdiction sdny memo.txt

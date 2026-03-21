@@ -50,6 +50,15 @@ def _cache_path(output_path: Optional[Path]) -> Optional[Path]:
     return output_path.with_suffix(".cache.json")
 
 
+def _dir_cache_path(directory: Path) -> Path:
+    """Canonical per-directory cache — always written on every scan.
+
+    Stored as {directory}/.legal-scan-cache.json.  Query mode reads from
+    here so it can find pre-analyzed results without an --output path.
+    """
+    return directory / ".legal-scan-cache.json"
+
+
 def load_hash_cache(cache_file: Optional[Path]) -> dict[str, dict]:
     """Load {doc_hash: result_dict} from the cache file."""
     if not cache_file or not cache_file.exists():
@@ -438,6 +447,215 @@ def extract_key_terms(text: str) -> dict:
     return results
 
 
+# ── Cross-document query mode ─────────────────────────────────────────────────
+#
+# "Find every contract with uncapped indemnification" across an entire library.
+# Searches cached results (signals + excerpts) for the query terms.  If the
+# directory has no cache yet, runs a quick risk scan first to build it.
+
+
+def _query_terms_from_string(query: str) -> list[str]:
+    """Split a free-text query into individual search tokens (≥3 chars)."""
+    # Keep multi-word phrases as single tokens after splitting on commas/semicolons
+    parts = re.split(r"[,;]+", query)
+    tokens = []
+    for part in parts:
+        part = part.strip()
+        if part:
+            tokens.append(part.lower())
+    # If no comma/semicolon split occurred, also split on spaces for keyword matching
+    if len(tokens) == 1:
+        words = [w.lower() for w in query.split() if len(w) >= 3]
+        if words:
+            tokens.extend(words)
+    return list(dict.fromkeys(tokens))  # deduplicate, preserve order
+
+
+def _score_result_against_query(result: dict, query_tokens: list[str]) -> tuple[int, list[str]]:
+    """Return (score, matched_excerpts) for how well a cached result matches the query.
+
+    Scoring:
+      +3  for each token found in a signal label
+      +2  for each token found in a signal hint
+      +1  for each token found in a signal excerpt
+    Returns the top matching excerpts (deduplicated, up to 5).
+    """
+    score = 0
+    matched_excerpts: list[str] = []
+    seen_excerpts: set[str] = set()
+
+    signals = result.get("signals", [])
+    for sig in signals:
+        label = sig.get("label", "").lower()
+        hint = sig.get("hint", "").lower()
+        excerpt = sig.get("excerpt", "")
+        excerpt_lower = excerpt.lower()
+
+        label_hit = any(tok in label for tok in query_tokens)
+        hint_hit = any(tok in hint for tok in query_tokens)
+        excerpt_hit = any(tok in excerpt_lower for tok in query_tokens)
+
+        if label_hit:
+            score += 3
+        if hint_hit:
+            score += 2
+        if (label_hit or hint_hit or excerpt_hit) and excerpt:
+            key = excerpt[:80]
+            if key not in seen_excerpts:
+                matched_excerpts.append(excerpt)
+                seen_excerpts.add(key)
+        elif excerpt_hit and excerpt:
+            score += 1
+            key = excerpt[:80]
+            if key not in seen_excerpts:
+                matched_excerpts.append(excerpt)
+                seen_excerpts.add(key)
+
+    return score, matched_excerpts[:5]
+
+
+def query_documents(
+    directory: Path,
+    query: str,
+    output_path: Optional[Path] = None,
+) -> str:
+    """Cross-document query: find every cached contract matching the query.
+
+    Steps:
+      1. Load the canonical directory cache.
+      2. If no cache exists, run a full risk scan first to build it.
+      3. Score every cached result against the query tokens.
+      4. Return a ranked report of matching documents with evidence excerpts.
+    """
+    dir_cache = _dir_cache_path(directory)
+    query_tokens = _query_terms_from_string(query)
+
+    # ── Step 1: Load or build cache ─────────────────────────────────────────
+    if not dir_cache.exists():
+        print(
+            f"  No cache found for {directory}. Running quick risk scan to build it...",
+            file=sys.stderr,
+        )
+        # Run a full risk scan — this writes to the dir cache as a side effect
+        process_batch(
+            directory=directory,
+            mode="risk",
+            focus_terms=None,
+            output_path=output_path,
+            fmt="markdown",
+            resume=False,
+        )
+        if not dir_cache.exists():
+            return (
+                f"# Query: {query}\n\n"
+                "No documents found or cache could not be built. "
+                f"Ensure {directory} contains .txt, .pdf, or .docx files."
+            )
+
+    cached_results = list(load_hash_cache(dir_cache).values())
+    if not cached_results:
+        return f"# Query: {query}\n\nCache is empty. Re-run a scan first."
+
+    # ── Step 2: Score every document against the query ──────────────────────
+    scored: list[tuple[int, list[str], dict]] = []
+    for result in cached_results:
+        if result.get("skipped"):
+            continue
+        score, excerpts = _score_result_against_query(result, query_tokens)
+        if score > 0:
+            scored.append((score, excerpts, result))
+
+    # Sort highest score first
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    # ── Step 3: Format report ────────────────────────────────────────────────
+    today = date.today().isoformat()
+    total_scanned = len(cached_results)
+    total_matches = len(scored)
+
+    lines = [
+        "# Cross-Document Query Report",
+        f"Query: **{query}**",
+        f"Generated: {today}",
+        f"Documents searched: {total_scanned}",
+        f"Documents matching: {total_matches}",
+        "",
+    ]
+
+    if not scored:
+        lines += [
+            f"No documents matched the query: **{query}**",
+            "",
+            "Suggestions:",
+            "- Check spelling or try broader terms",
+            "- Run `--mode risk` scan first if documents haven't been analyzed yet",
+            "- Try `--batch-focus` with specific risk terms for more targeted scanning",
+        ]
+        return "\n".join(lines)
+
+    lines += [
+        "## Matching Documents",
+        "",
+        "| Document | Risk Level | Match Score | Top Issue |",
+        "|----------|-----------|-------------|-----------|",
+    ]
+    for score, excerpts, result in scored:
+        doc = result["doc"]
+        risk = result.get("risk_level", "—")
+        icon = RISK_EMOJI.get(risk, "")
+        sigs = result.get("signals", [])
+        # Find the top signal that matched
+        top_sig = ""
+        for sig in sigs:
+            label = sig.get("label", "").lower()
+            hint = sig.get("hint", "").lower()
+            if any(tok in label or tok in hint for tok in query_tokens):
+                top_sig = sig.get("label", "")
+                break
+        if not top_sig and sigs:
+            top_sig = sigs[0].get("label", "")
+        lines.append(f"| {doc} | {icon} {risk} | {score} | {top_sig} |")
+
+    lines += ["", "## Evidence by Document", ""]
+
+    for score, excerpts, result in scored:
+        doc = result["doc"]
+        risk = result.get("risk_level", "—")
+        icon = RISK_EMOJI.get(risk, "")
+        parties = result.get("parties", [])
+        party_str = " ↔ ".join(
+            f"{p['name']} ({p['role']})" for p in parties
+        ) if parties else "Not identified"
+
+        lines += [
+            f"### {doc}",
+            f"**Risk Level**: {icon} {risk}  |  **Match Score**: {score}",
+            f"**Parties**: {party_str}",
+            "",
+            f"**Matching signals for** *{query}*:",
+        ]
+
+        # List all signals that matched the query
+        sigs = result.get("signals", [])
+        matched_sigs = [
+            s for s in sigs
+            if any(tok in s.get("label", "").lower() or tok in s.get("hint", "").lower()
+                   for tok in query_tokens)
+        ]
+        if not matched_sigs:
+            matched_sigs = sigs  # fall back to all signals if excerpt-only match
+        for sig in matched_sigs[:5]:
+            sev_icon = RISK_EMOJI.get(sig.get("severity", ""), "")
+            lines.append(f"- {sev_icon} **{sig['label']}** — {sig.get('hint', '')}")
+            exc = sig.get("excerpt", "")
+            if exc:
+                lines.append(f"  > *\"{exc[:250].replace(chr(10), ' ')}\"*")
+
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 # ── Report formatters ──────────────────────────────────────────────────────────
 
 RISK_EMOJI = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}
@@ -818,6 +1036,8 @@ def process_batch(
         # Write incremental hash cache (replaces legacy state file)
         if cache_file:
             save_hash_cache(cache_file, cache_entries)
+        # Always mirror to the canonical directory-level cache for query mode
+        save_hash_cache(_dir_cache_path(directory), cache_entries)
 
     # Generate report
     if mode == "risk":
@@ -829,6 +1049,8 @@ def process_batch(
             report = format_terms_report_csv(results)
         else:
             report = format_terms_report_md(results)
+    else:
+        report = f"Unknown mode: {mode}"
 
     # Clean up legacy state file if it exists (replaced by hash cache)
     legacy_state = output_path.with_suffix(".state.json") if output_path else None
@@ -946,14 +1168,19 @@ Examples:
   python3 tools/batch-scanner.py discovery/ --mode privilege
   python3 tools/batch-scanner.py contracts/ --mode terms --format csv
   python3 tools/batch-scanner.py contracts/ --mode terms --output terms.md
+  python3 tools/batch-scanner.py contracts/ --mode query --focus "uncapped indemnification"
         """,
     )
     parser.add_argument("directory", help="Directory containing contracts to scan")
     parser.add_argument(
         "--mode", "-M",
-        choices=["risk", "privilege", "terms"],
+        choices=["risk", "privilege", "terms", "query"],
         default="risk",
-        help="Scan mode: risk (default), privilege, or terms",
+        help=(
+            "Scan mode: risk (default), privilege, terms, or query.\n"
+            "  query — search cached results across all documents for --focus terms.\n"
+            "          Builds the cache automatically if it doesn't exist yet."
+        ),
     )
     parser.add_argument(
         "--output", "-o",
@@ -1000,14 +1227,29 @@ Examples:
         print(f"  Focus terms: {', '.join(focus_terms)}", file=sys.stderr)
     print("", file=sys.stderr)
 
-    report = process_batch(
-        directory=directory,
-        mode=args.mode,
-        focus_terms=focus_terms,
-        output_path=output_path,
-        fmt=args.format,
-        resume=args.resume,
-    )
+    if args.mode == "query":
+        if not focus_terms:
+            print(
+                "Error: --mode query requires --focus <query terms>\n"
+                "  Example: --mode query --focus \"uncapped indemnification\"",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        query_str = ", ".join(focus_terms)
+        report = query_documents(
+            directory=directory,
+            query=query_str,
+            output_path=output_path,
+        )
+    else:
+        report = process_batch(
+            directory=directory,
+            mode=args.mode,
+            focus_terms=focus_terms,
+            output_path=output_path,
+            fmt=args.format,
+            resume=args.resume,
+        )
 
     if output_path:
         output_path.write_text(report)
