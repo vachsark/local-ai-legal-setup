@@ -915,6 +915,61 @@ class Tools:
 
         return "\n".join(lines)
 
+    def validate_output(self, report: str) -> dict:
+        """
+        Validate that a compliance report conforms to the expected schema.
+
+        Checks that the report has a recognized header, an Overall verdict,
+        and at least one check result. Returns {"valid": bool, "errors": list[str]}.
+
+        Useful for pipeline integration — catches silent failures where the
+        tool returns a partial or malformed report due to truncation or errors.
+
+        :param report: Markdown string returned by check_court_filing().
+        :return: {"valid": bool, "errors": list[str]}
+        """
+        errors: list[str] = []
+
+        if not report or not report.strip():
+            errors.append("Report is empty")
+            return {"valid": False, "errors": errors}
+
+        if report.startswith("Error:") or report.startswith("Error running"):
+            errors.append(f"Report contains an error: {report[:200]}")
+            return {"valid": False, "errors": errors}
+
+        # Must start with the expected header
+        if not report.startswith("## Filing Compliance Check"):
+            errors.append(
+                "Missing expected header '## Filing Compliance Check — <jurisdiction>'. "
+                "Report may be from a different tool or malformed."
+            )
+
+        # Must have an Overall verdict
+        verdict_markers = ["**Overall:", "**Overall: ✓", "**Overall: ✗", "**Overall: ⚠"]
+        if not any(m in report for m in verdict_markers):
+            errors.append(
+                "Missing Overall verdict line ('**Overall: PASS/FAIL/REVIEW**'). "
+                "Report may be truncated."
+            )
+
+        # Must have at least one check result (✓, ✗, or ⚠)
+        import re as _re
+        check_lines = _re.findall(r'^[✓✗⚠?] \*\*', report, _re.MULTILINE)
+        if not check_lines:
+            errors.append(
+                "No check result lines found. Expected lines starting with ✓, ✗, or ⚠. "
+                "Report may be empty or truncated."
+            )
+
+        # Word count should be present
+        if "**Word count:**" not in report:
+            errors.append(
+                "Missing '**Word count:**' line. Report may be truncated before check results."
+            )
+
+        return {"valid": len(errors) == 0, "errors": errors}
+
 
 # ── CLI entry point ───────────────────────────────────────────────────────────
 

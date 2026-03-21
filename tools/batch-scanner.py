@@ -826,6 +826,11 @@ def format_risk_report(results: list[dict], focus_terms: Optional[list[str]]) ->
         ) if parties else "Not identified"
 
         lines += [
+            # Document boundary markers — unambiguous delimiters so downstream
+            # consumers (LLMs, parsers) can locate each document's analysis even
+            # in long multi-document reports. Pattern mirrors document-qa.py's
+            # [DOCUMENT: ...] / [END: ...] convention.
+            f"<!-- [DOCUMENT: {r['doc']}] -->",
             f"### {r['doc']}",
             f"**Risk Level**: {icon} {risk}",
             f"**Parties**: {party_str}",
@@ -862,7 +867,7 @@ def format_risk_report(results: list[dict], focus_terms: Optional[list[str]]) ->
             for line in ai_analysis.splitlines():
                 lines.append(line)
 
-        lines.append("")
+        lines += ["", f"<!-- [END: {r['doc']}] -->", ""]
 
     return "\n".join(lines)
 
@@ -910,7 +915,11 @@ def format_privilege_report(results: list[dict]) -> str:
 
         cls = r.get("classification", "NOT PRIVILEGED")
         icon = PRIV_EMOJI.get(cls, "")
-        lines += [f"### {r['doc']}", f"**Classification**: {icon} {cls}"]
+        lines += [
+            f"<!-- [DOCUMENT: {r['doc']}] -->",
+            f"### {r['doc']}",
+            f"**Classification**: {icon} {cls}",
+        ]
 
         signals = r.get("signals", [])
         if not signals:
@@ -923,7 +932,7 @@ def format_privilege_report(results: list[dict]) -> str:
                     excerpt = s["excerpt"][:200].replace("\n", " ")
                     lines.append(f"  > *\"{excerpt}\"*")
 
-        lines.append("")
+        lines += ["", f"<!-- [END: {r['doc']}] -->", ""]
 
     return "\n".join(lines)
 
@@ -1268,6 +1277,74 @@ class Tools:
             })
 
         return report
+
+    def validate_output(self, report: str) -> dict:
+        """
+        Validate that a scan report conforms to the expected schema.
+
+        Checks that the report is non-empty, contains the expected header,
+        has at least one document section, and no truncation artifacts.
+        Returns {"valid": bool, "errors": list[str]}.
+
+        Useful for pipeline integration where scan output is consumed
+        programmatically — catches format drift and early termination silently.
+
+        :param report: The markdown report string returned by scan_contracts().
+        :return: {"valid": bool, "errors": list[str]}
+        """
+        errors: list[str] = []
+
+        if not report or not report.strip():
+            errors.append("Report is empty")
+            return {"valid": False, "errors": errors}
+
+        # Must have a recognized top-level header
+        known_headers = [
+            "# Contract Risk Report",
+            "# Privilege Review Report",
+            "# Key Terms Extraction Report",
+            "# Cross-Document Query Report",
+        ]
+        if not any(report.startswith(h) for h in known_headers):
+            errors.append(
+                f"Missing recognized report header. Expected one of: "
+                + ", ".join(f'"{h}"' for h in known_headers)
+            )
+
+        # Should contain at least one document section (### DocName)
+        import re as _re
+        doc_sections = _re.findall(r"^### .+", report, _re.MULTILINE)
+        if not doc_sections:
+            errors.append(
+                "No document sections found (expected '### <docname>' headings). "
+                "Report may be empty or represent a zero-document directory."
+            )
+
+        # Check for common truncation artifacts from Ollama num_predict cuts
+        truncation_signals = [
+            "... [document truncated",
+            "[AI analysis timed out",
+            "[AI analysis returned empty",
+        ]
+        trunc_found = [s for s in truncation_signals if s in report]
+        if trunc_found:
+            errors.append(
+                f"Truncation artifact(s) detected in report: {trunc_found}. "
+                "Consider raising num_predict or reducing document size."
+            )
+
+        # Risk reports should have a Summary Table
+        if report.startswith("# Contract Risk Report"):
+            if "## Summary Table" not in report:
+                errors.append(
+                    "Contract Risk Report is missing '## Summary Table' section."
+                )
+            if "## Detailed Findings" not in report:
+                errors.append(
+                    "Contract Risk Report is missing '## Detailed Findings' section."
+                )
+
+        return {"valid": len(errors) == 0, "errors": errors}
 
 
 # ── CLI entrypoint ─────────────────────────────────────────────────────────────
