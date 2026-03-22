@@ -321,6 +321,30 @@ class TestReadabilityScorer:
         bands = result["reference_bands"]
         assert len(bands) >= 6
 
+    def test_validate_output_passes_valid_json(self, simple_text):
+        """validate_output should return valid=True for well-formed output."""
+        json_str = run(self.tools.score_readability(simple_text))
+        result = self.tools.validate_output(json_str)
+        assert result["valid"], f"Validation errors: {result.get('errors')}"
+
+    def test_validate_output_fails_on_empty_string(self):
+        result = self.tools.validate_output("")
+        assert not result["valid"]
+        assert "errors" in result
+
+    def test_validate_output_fails_on_missing_key(self, simple_text):
+        """Removing a required key should be caught by validate_output."""
+        data = json.loads(run(self.tools.score_readability(simple_text)))
+        del data["readability_scores"]
+        result = self.tools.validate_output(json.dumps(data))
+        assert not result["valid"]
+        assert any("readability_scores" in e for e in result["errors"])
+
+    def test_validate_output_fails_on_garbage_json(self):
+        result = self.tools.validate_output("not json at all")
+        assert not result["valid"]
+        assert "errors" in result
+
 
 # ── 4. AI Disclaimer unit tests ──────────────────────────────────────────────
 
@@ -691,3 +715,52 @@ class TestCrossToolConsistency:
         assert not suspicious, (
             f"{filename} may contain hardcoded secrets: {suspicious}"
         )
+
+
+# ── 10. Mentor QA input validation tests ─────────────────────────────────────
+
+class TestMentorQA:
+
+    @pytest.fixture(autouse=True)
+    def load_module(self):
+        self.mod = load_tool("mentor-qa.py")
+        self.tools = self.mod.Tools()
+
+    def test_billing_guidance_empty_input_returns_helpful_message(self):
+        """Empty task should return a descriptive error, not a half-formed prompt."""
+        result = run(self.tools.billing_guidance(""))
+        assert isinstance(result, str)
+        assert len(result) > 0
+        # Should not contain the raw billing prompt template
+        assert "TASK TO BILL:" not in result
+
+    def test_billing_guidance_whitespace_only_returns_helpful_message(self):
+        result = run(self.tools.billing_guidance("   "))
+        assert "TASK TO BILL:" not in result
+
+    def test_billing_guidance_valid_input_returns_prompt(self):
+        result = run(self.tools.billing_guidance("I drafted a 5-page memo on tortious interference."))
+        assert "TASK TO BILL:" in result
+
+    def test_client_communication_empty_input_returns_helpful_message(self):
+        result = run(self.tools.client_communication(""))
+        assert isinstance(result, str)
+        # Should not contain the raw communication prompt
+        assert "SITUATION:" not in result
+
+    def test_client_communication_valid_input_returns_prompt(self):
+        result = run(self.tools.client_communication("Client asking for a status update on their lease negotiation."))
+        assert "SITUATION:" in result
+
+    def test_ethics_scenario_empty_input_returns_helpful_message(self):
+        result = run(self.tools.ethics_scenario(""))
+        assert isinstance(result, str)
+        assert "SCENARIO:" not in result
+
+    def test_ethics_scenario_whitespace_only_returns_helpful_message(self):
+        result = run(self.tools.ethics_scenario("   \n  "))
+        assert "SCENARIO:" not in result
+
+    def test_ethics_scenario_valid_input_returns_prompt(self):
+        result = run(self.tools.ethics_scenario("My partner asked me to backdate a document."))
+        assert "SCENARIO:" in result

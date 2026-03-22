@@ -81,6 +81,13 @@ class Tools:
         :param task: Describe the task you want billing guidance on (e.g., "I researched for 3 hours and drafted a 5-page memo on tortious interference", "I reviewed 200 emails for discovery", "I attended a 30-minute client call").
         :return: A billing guidance prompt for the LLM to generate.
         """
+        if not task or not task.strip():
+            return (
+                "Please describe the task you want billing guidance on. "
+                "Example: \"I researched for 3 hours and drafted a 5-page memo on tortious interference\" "
+                "or \"I reviewed 200 emails for discovery\"."
+            )
+
         if __event_emitter__:
             await __event_emitter__(
                 {
@@ -171,6 +178,13 @@ Tone: Direct, practical, non-judgmental. New attorneys often feel embarrassed as
         :param communication_type: The format: "email", "letter", "call_summary", "voicemail_script", or "in_person_guidance".
         :return: A client communication guidance prompt for the LLM to generate.
         """
+        if not situation or not situation.strip():
+            return (
+                "Please describe the client communication situation. "
+                "Example: \"client is asking for a status update on their contract negotiation\" "
+                "or \"I need to deliver bad news that we lost the motion\"."
+            )
+
         if __event_emitter__:
             await __event_emitter__(
                 {
@@ -336,6 +350,13 @@ Tone: Honest and direct. This person is trying to build a career, not just get t
         :param scenario: Describe the ethics situation (e.g., "My supervising partner asked me to backdate a document", "A client told me they're planning to commit fraud — what do I do?", "I accidentally received opposing counsel's privileged documents by email").
         :return: An ethics analysis prompt for the LLM to execute.
         """
+        if not scenario or not scenario.strip():
+            return (
+                "Please describe the ethics scenario you want analyzed. "
+                "Example: \"My supervising partner asked me to backdate a document\" "
+                "or \"A client told me they're planning to commit fraud — what do I do?\"."
+            )
+
         if __event_emitter__:
             await __event_emitter__(
                 {

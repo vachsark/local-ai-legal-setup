@@ -241,3 +241,50 @@ class Tools:
         }
 
         return json.dumps(output, indent=2)
+
+    def validate_output(self, json_str: str) -> dict:
+        """
+        Validate that score_readability output conforms to the expected schema.
+
+        Returns {"valid": True} on success, or {"valid": False, "errors": [...]} listing
+        every missing key so callers can catch schema drift early.
+        """
+        errors = []
+        try:
+            data = json.loads(json_str)
+        except (json.JSONDecodeError, TypeError) as exc:
+            return {"valid": False, "errors": [f"JSON parse error: {exc}"]}
+
+        required_top = {"readability_scores", "sentence_statistics", "legal_interpretation", "reference_bands"}
+        for key in required_top:
+            if key not in data:
+                errors.append(f"Missing top-level key: '{key}'")
+
+        if "readability_scores" in data:
+            required_scores = {
+                "flesch_reading_ease",
+                "flesch_kincaid_grade",
+                "gunning_fog_index",
+                "smog_index",
+                "coleman_liau_index",
+                "automated_readability_index",
+                "dale_chall_score",
+                "average_grade_level",
+            }
+            for key in required_scores:
+                if key not in data["readability_scores"]:
+                    errors.append(f"Missing readability_scores key: '{key}'")
+
+        if "sentence_statistics" in data:
+            required_stats = {
+                "total_sentences",
+                "total_words",
+                "average_sentence_length",
+                "long_sentences_over_40_words",
+                "estimated_passive_voice_instances",
+            }
+            for key in required_stats:
+                if key not in data["sentence_statistics"]:
+                    errors.append(f"Missing sentence_statistics key: '{key}'")
+
+        return {"valid": len(errors) == 0} if not errors else {"valid": False, "errors": errors}
