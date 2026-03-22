@@ -4,7 +4,7 @@ AI assistance for legal work — without sending client data to the cloud.
 
 Every query runs entirely on your own hardware. After a one-time model download, there are no API calls, no cloud services, no subscription fees, and nothing ever leaves your machine. Client confidentiality is protected by design.
 
-**What you get**: A ChatGPT-style chat interface in your browser + a `legal-check` command-line tool + 9 specialized legal AI presets + ABA compliance templates and a supervision logging system.
+**What you get**: A ChatGPT-style chat interface in your browser + a `legal-check` command-line tool + 9 core legal AI presets (16 total including advanced/optional) + 22 Open WebUI tools + 5 ABA compliance templates + a supervision logging system.
 
 **Designed for**: Solo attorneys and small firms on Linux (AMD GPU) or macOS (Apple Silicon). Windows also supported.
 
@@ -867,11 +867,15 @@ python3 tools/batch-scanner.py contracts/ --focus "indemnification" --ai --ai-mo
 
 **Content-hash cache**: Results are cached by SHA-256 of file contents. Re-runs only process changed files — editing a contract forces reprocessing even if the filename is unchanged.
 
+**Document boundary markers**: Reports include `<!-- [DOCUMENT: name] -->` / `<!-- [END: name] -->` HTML comment delimiters around each document section. These don't affect markdown rendering but allow programmatic parsing of multi-document reports — useful when piping batch-scanner output into a downstream tool or LLM query.
+
+**Output validation**: The `validate_output()` method checks reports for structural completeness (required sections present, no truncation artifacts from model timeouts, at least one document section). Pipeline integrations can call this to detect silent failures before consuming results.
+
 ---
 
 ## Tools (Import Manually)
 
-Three custom tools are included in the `tools/` folder. Unlike presets, tools must be imported manually into Open WebUI.
+Five custom tools are included in the `tools/` folder for the core workflow. Unlike presets, tools must be imported manually into Open WebUI.
 
 ### How to Import
 
@@ -1507,7 +1511,7 @@ Law school AI tools typically cost $25–$40/month (Quimbee, Westlaw student pla
 
 ### What's Available for Students
 
-Four tools are included — import them into Open WebUI following the [Tools import instructions](#tools-import-manually) above. One Modelfile creates a Socratic tutor preset.
+Three tools are included for law students — import them into Open WebUI following the [Tools import instructions](#tools-import-manually) above. One Modelfile creates a Socratic tutor preset.
 
 #### case-briefer (tools/case-briefer.py)
 
